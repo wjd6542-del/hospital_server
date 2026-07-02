@@ -89,4 +89,4 @@ if (fs.existsSync(routesPath)) {
 }
 
 await app.ready();
-app.listen({ port: 3003, host: "0.0.0.0" });
+app.listen({ port: Number(process.env.PORT) || 3003, host: "0.0.0.0" });
