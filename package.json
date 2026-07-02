@@ -1,0 +1,30 @@
+{
+  "name": "cs-server",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "node server/index.js",
+    "dev:watch": "node --watch server/index.js",
+    "prisma": "prisma",
+    "seed": "node prisma/seed.js",
+    "seed:board": "node prisma/seed-board.js",
+    "seed:rbac": "node prisma/seed-rbac.js",
+    "test": "node --test test/"
+  },
+  "dependencies": {
+    "@fastify/cors": "^9.0.0",
+    "@fastify/helmet": "^13.0.2",
+    "@fastify/multipart": "^7.7.3",
+    "@fastify/static": "^7.0.0",
+    "@prisma/client": "^5.22.0",
+    "bcrypt": "^6.0.0",
+    "dayjs": "^1.11.20",
+    "fastify": "^4.26.0",
+    "jsonwebtoken": "^9.0.3",
+    "resend": "^6.9.3",
+    "zod": "^4.3.6"
+  },
+  "devDependencies": {
+    "prisma": "^5.9.0"
+  }
+}

@@ -1,0 +1,498 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+//////////////////////////////////////////////////////////////
+// 로그 / 알림 enum
+//////////////////////////////////////////////////////////////
+
+enum LogAction {
+  CREATE
+  UPDATE
+  DELETE
+  UPSERT
+  CREATEMANY
+  UPSERTMANY
+  DELETEMANY
+  VIEW
+  LOGIN
+  LOGOUT
+}
+
+enum LogStatus {
+  SUCCESS
+  FAIL
+}
+
+enum NotificationType {
+  SYSTEM
+}
+
+//////////////////////////////////////////////////////////////
+// 권한 / 사용자
+//////////////////////////////////////////////////////////////
+
+/// 사용자 역할 (관리자, 일반 사용자 등)
+model Role {
+  id          Int     @id @default(autoincrement())
+  name        String  @unique // 역할 이름 (고유)
+  description String? // 역할 설명
+  is_super    Boolean @default(false) // 슈퍼 관리자 여부
+  is_active   Boolean @default(true) // 활성화 여부 (false 면 기본 리스트에서 제외)
+  sort        Int     @default(0) // 정렬 순서
+
+  users User[]
+
+  created_at  DateTime         @default(now())
+  permissions RolePermission[]
+}
+
+/// 시스템 사용자
+model User {
+  id Int @id @default(autoincrement())
+
+  username String @unique @db.VarChar(100) // 로그인 아이디 (고유)
+  password String @db.VarChar(255) // 해시된 비밀번호
+
+  name  String  @db.VarChar(100) // 실명
+  email String? @db.VarChar(200) // 이메일
+  code  String? @db.VarChar(15) // 사번 또는 식별 코드
+
+  role_id Int
+  role    Role @relation(fields: [role_id], references: [id]) // 역할 참조
+
+  is_active   Boolean @default(true) // 계정 활성화 여부
+  ip_restrict Boolean @default(false) // IP 제한 사용 여부 (true면 화이트리스트만 접근 가능)
+
+  last_login DateTime? // 마지막 로그인 일시
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  logs             AuditLog[]
+  notifications    Notification[]
+  userIpWhitelists UserIpWhitelist[]
+  posts            Post[]
+  postComments     PostComment[]
+}
+
+/// 권한 항목 (기능 단위 접근 제어)
+model Permission {
+  id        Int              @id @default(autoincrement())
+  code      String           @unique // 권한 코드 (예: material.read, inbound.create)
+  name      String // 권한 표시명
+  group     String // UI 그룹 (예: 품목관리, 입고관리)
+  action    String           @default("") // HTTP 메서드 또는 액션 유형
+  is_active Boolean          @default(true) // 활성화 여부
+  sort      Int              @default(0)
+  roles     RolePermission[]
+}
+
+/// 역할-권한 매핑 (다대다 중간 테이블)
+model RolePermission {
+  id            Int        @id @default(autoincrement())
+  role_id       Int
+  permission_id Int
+  role          Role       @relation(fields: [role_id], references: [id])
+  permission    Permission @relation(fields: [permission_id], references: [id])
+
+  @@unique([role_id, permission_id]) // 동일 역할에 동일 권한 중복 불가
+}
+
+/// 사용자 IP 화이트리스트 (ip_restrict=true인 사용자에게 적용)
+model UserIpWhitelist {
+  id        Int     @id @default(autoincrement())
+  user_id   Int
+  ip        String // 허용 IP (IPv4 / IPv6)
+  memo      String? // 메모 (예: 회사 VPN, 재택 IP)
+  is_active Boolean @default(true) // 활성화 여부
+
+  user User @relation(fields: [user_id], references: [id])
+
+  created_at DateTime @default(now())
+
+  @@unique([user_id, ip]) // 동일 사용자에 동일 IP 중복 불가
+  @@index([user_id])
+}
+
+/// 시스템 감사 로그 (누가 언제 무엇을 했는지 추적)
+model AuditLog {
+  id Int @id @default(autoincrement())
+
+  user_id Int?
+  user    User? @relation(fields: [user_id], references: [id]) // 행위 주체 (미로그인 시 null)
+
+  page   String // 액션이 발생한 페이지/모듈
+  action LogAction // 수행한 액션 유형
+
+  target_type String? // 대상 모델명 (예: Material)
+  target_id   Int? // 대상 레코드 ID
+
+  description String? @db.Text // 액션 설명
+
+  before_data Json? // 변경 전 데이터 스냅샷
+  after_data  Json? // 변경 후 데이터 스냅샷
+
+  ip         String? // 클라이언트 IP
+  user_agent String? // 브라우저/클라이언트 정보
+
+  status LogStatus @default(SUCCESS) // 처리 결과
+
+  created_at DateTime @default(now())
+
+  @@index([user_id])
+}
+
+/// 사용자 알림
+model Notification {
+  id Int @id @default(autoincrement())
+
+  user_id     Int?
+  user        User?            @relation(fields: [user_id], references: [id])
+  type        NotificationType // 알림 유형
+  title       String? // 알림 제목
+  message     String? // 알림 본문
+  action      String? // 클릭 시 이동할 경로
+  target_type String? // 연관 대상 모델명
+  target_id   Int? // 연관 대상 레코드 ID
+
+  is_read    Boolean   @default(false) // 읽음 여부
+  read_at    DateTime? // 읽은 일시
+  created_at DateTime  @default(now())
+
+  @@index([user_id])
+  @@index([is_read])
+}
+
+//////////////////////////////////////////////////////////////
+// 설정
+//////////////////////////////////////////////////////////////
+
+/// 시스템 설정 (키-값 형태의 동적 설정 관리)
+model Settings {
+  id Int @id @default(autoincrement())
+
+  key  String @db.VarChar(100) // 설정 키 (예: company_name)
+  text String @db.VarChar(255) // 설정 표시명 (UI용 레이블)
+
+  value String @db.Text // 설정 값
+
+  is_active Boolean @default(true) // 활성화 여부
+
+  sort Int @default(0) // 정렬 순서
+
+  created_at DateTime? @default(now())
+  updated_at DateTime? @updatedAt
+
+  @@index([sort])
+}
+
+/// 공통 카테고리 (드롭다운 등 공통 코드 관리)
+model Category {
+  id Int @id @default(autoincrement())
+
+  text  String @db.VarChar(255) // 표시명
+  value String @db.VarChar(255) // 코드값
+
+  is_active Boolean @default(true)
+
+  sort Int @default(0)
+
+  created_at DateTime? @default(now())
+  updated_at DateTime? @updatedAt
+
+  @@index([sort])
+}
+
+//////////////////////////////////////////////////////////////
+// CS ERP 도메인 (중간 판매자: 게임사에 사용료 지급, 업체에서 사용대금 회수)
+//////////////////////////////////////////////////////////////
+
+/// 지급/회수 구분: PAYMENT=지급(게임사向), COLLECTION=회수(업체発)
+enum LedgerType {
+  PAYMENT
+  COLLECTION
+}
+
+/// 정산 구분: VENDOR=업체 정산(회수), GAME_COMPANY=게임사 정산(지급)
+enum SettlementType {
+  VENDOR
+  GAME_COMPANY
+}
+
+/// 정산 상태
+enum SettlementStatus {
+  PENDING // 대기
+  PARTIAL // 부분정산
+  DONE // 완료
+}
+
+/// 응대 대상: VENDOR=업체, GAME_COMPANY=게임사
+enum SupportParty {
+  VENDOR
+  GAME_COMPANY
+}
+
+/// 응대 상태
+enum TicketStatus {
+  OPEN // 접수
+  IN_PROGRESS // 처리중
+  RESOLVED // 해결
+  CLOSED // 종료
+}
+
+/// 게임사 (사용료를 지급하는 대상)
+model GameCompany {
+  id            Int     @id @default(autoincrement())
+  name          String // 게임사명
+  code          String? @unique // 식별 코드
+  contact_name  String? // 담당자
+  contact_phone String?
+  contact_email String?
+  fee_rate      Decimal? @db.Decimal(7, 4) // 사용료율(%) 참고값
+  memo          String? @db.Text
+  is_active     Boolean @default(true)
+  sort          Int     @default(0)
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  ledgerEntries LedgerEntry[]
+  settlements   Settlement[]
+  tickets       SupportTicket[]
+
+  @@index([sort])
+}
+
+/// 업체 (사용대금을 회수하는 대상)
+model Vendor {
+  id            Int     @id @default(autoincrement())
+  name          String // 업체명
+  code          String? @unique // 식별 코드
+  contact_name  String? // 담당자
+  contact_phone String?
+  contact_email String?
+  memo          String? @db.Text
+  is_active     Boolean @default(true)
+  sort          Int     @default(0)
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  ledgerEntries LedgerEntry[]
+  settlements   Settlement[]
+  tickets       SupportTicket[]
+
+  @@index([sort])
+}
+
+/// 장부 원장 (지급/회수 거래 기록)
+model LedgerEntry {
+  id         Int        @id @default(autoincrement())
+  type       LedgerType // PAYMENT(지급) / COLLECTION(회수)
+  entry_date DateTime // 거래 일자
+  amount     Decimal    @db.Decimal(15, 2)
+
+  game_company_id Int?
+  game_company    GameCompany? @relation(fields: [game_company_id], references: [id])
+  vendor_id       Int?
+  vendor          Vendor?      @relation(fields: [vendor_id], references: [id])
+
+  settlement_id Int? // 정산에서 파생된 경우 연결
+  settlement    Settlement? @relation(fields: [settlement_id], references: [id])
+
+  memo       String? @db.Text
+  created_by Int? // User.id (관계 미강제)
+  created_at DateTime @default(now())
+
+  @@index([type])
+  @@index([entry_date])
+  @@index([game_company_id])
+  @@index([vendor_id])
+  @@index([settlement_id])
+}
+
+/// 정산 (기간별 업체 회수 / 게임사 지급 집계)
+model Settlement {
+  id   Int            @id @default(autoincrement())
+  type SettlementType // VENDOR(업체 회수) / GAME_COMPANY(게임사 지급)
+
+  vendor_id       Int?
+  vendor          Vendor?      @relation(fields: [vendor_id], references: [id])
+  game_company_id Int?
+  game_company    GameCompany? @relation(fields: [game_company_id], references: [id])
+
+  period_start DateTime
+  period_end   DateTime
+
+  amount         Decimal          @db.Decimal(15, 2) // 정산 대상 금액
+  settled_amount Decimal          @default(0) @db.Decimal(15, 2) // 처리된 금액
+  status         SettlementStatus @default(PENDING)
+
+  memo       String? @db.Text
+  created_by Int?
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  ledgerEntries LedgerEntry[]
+
+  @@index([type])
+  @@index([status])
+  @@index([vendor_id])
+  @@index([game_company_id])
+}
+
+/// CS 응대 티켓 (업체 응대 / 게임사 응대)
+model SupportTicket {
+  id    Int          @id @default(autoincrement())
+  party SupportParty // VENDOR / GAME_COMPANY
+
+  vendor_id       Int?
+  vendor          Vendor?      @relation(fields: [vendor_id], references: [id])
+  game_company_id Int?
+  game_company    GameCompany? @relation(fields: [game_company_id], references: [id])
+
+  title    String
+  category String?
+  status   TicketStatus @default(OPEN)
+  priority Int          @default(0) // 0=보통,1=높음,2=긴급
+
+  assignee_id Int? // 담당 User.id
+  created_by  Int?
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  messages SupportMessage[]
+
+  @@index([party])
+  @@index([status])
+  @@index([vendor_id])
+  @@index([game_company_id])
+}
+
+/// 응대 메시지 (티켓 내 대화 스레드)
+model SupportMessage {
+  id        Int           @id @default(autoincrement())
+  ticket_id Int
+  ticket    SupportTicket @relation(fields: [ticket_id], references: [id], onDelete: Cascade)
+
+  user_id    Int? // 작성 User.id
+  content    String   @db.Text
+  is_internal Boolean @default(false) // 내부 메모 여부
+  created_at DateTime @default(now())
+
+  @@index([ticket_id])
+}
+
+/// 자주 하는 질문 (FAQ)
+model Faq {
+  id         Int      @id @default(autoincrement())
+  category   String? // 분류
+  question   String
+  answer     String   @db.LongText
+  sort       Int      @default(0)
+  is_active  Boolean  @default(true)
+  view_count Int      @default(0)
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  @@index([category])
+  @@index([sort])
+}
+
+//////////////////////////////////////////////////////////////
+// 게시판 (board)
+//////////////////////////////////////////////////////////////
+
+/// 게시판 접근 레벨: ALL=전체, MEMBER=로그인 회원, ADMIN=관리자
+enum BoardPermLevel {
+  ALL
+  MEMBER
+  ADMIN
+}
+
+/// 게시판 (타입/권한/기능 토글로 다양하게 운용)
+model Board {
+  id          Int     @id @default(autoincrement())
+  name        String // 게시판명
+  slug        String  @unique // URL 식별자
+  description String? // 설명
+
+  read_level    BoardPermLevel @default(ALL) // 읽기 권한
+  write_level   BoardPermLevel @default(MEMBER) // 쓰기 권한
+  allow_comment Boolean        @default(true) // 댓글 허용
+  allow_upload  Boolean        @default(true) // 파일/이미지 첨부 허용
+
+  sort      Int     @default(0)
+  is_active Boolean @default(true)
+
+  created_at DateTime @default(now())
+
+  posts Post[]
+
+  @@index([sort])
+}
+
+/// 게시글
+model Post {
+  id       Int  @id @default(autoincrement())
+  board_id Int
+  board    Board @relation(fields: [board_id], references: [id])
+
+  user_id Int?
+  user    User? @relation(fields: [user_id], references: [id])
+
+  title   String
+  content String  @db.LongText // HTML 본문
+  is_notice  Boolean @default(false) // 공지 고정
+  view_count Int     @default(0)
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  comments    PostComment[]
+  attachments PostAttachment[]
+
+  @@index([board_id])
+  @@index([is_notice])
+  @@index([created_at])
+}
+
+/// 댓글
+model PostComment {
+  id      Int  @id @default(autoincrement())
+  post_id Int
+  post    Post @relation(fields: [post_id], references: [id], onDelete: Cascade)
+
+  user_id Int?
+  user    User? @relation(fields: [user_id], references: [id])
+
+  content    String   @db.Text
+  created_at DateTime @default(now())
+
+  @@index([post_id])
+}
+
+/// 게시글 첨부 (이미지/파일)
+model PostAttachment {
+  id      Int  @id @default(autoincrement())
+  post_id Int
+  post    Post @relation(fields: [post_id], references: [id], onDelete: Cascade)
+
+  path      String // /uploads/board/xxx
+  filename  String // 원본 파일명
+  mime_type String?
+  size      Int?
+  is_image  Boolean @default(false)
+
+  created_at DateTime @default(now())
+
+  @@index([post_id])
+}
