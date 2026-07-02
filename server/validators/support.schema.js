@@ -7,6 +7,7 @@ export const listSchema = z.object({
   status: z.enum(["OPEN", "IN_PROGRESS", "RESOLVED", "CLOSED"]).optional(),
   vendor_id: z.coerce.number().int().positive().optional(),
   game_company_id: z.coerce.number().int().positive().optional(),
+  tag_ids: z.array(z.coerce.number().int().positive()).optional(),
   q: z.string().trim().optional(),
   page: z.coerce.number().int().optional(),
   limit: z.coerce.number().int().optional(),
@@ -23,6 +24,7 @@ export const saveSchema = z
     status: z.enum(["OPEN", "IN_PROGRESS", "RESOLVED", "CLOSED"]).default("OPEN"),
     priority: z.coerce.number().int().min(0).max(2).default(0),
     assignee_id: z.coerce.number().int().positive().nullable().optional(),
+    tag_ids: z.array(z.coerce.number().int().positive()).optional(),
   })
   .refine(
     (d) => (d.party === "VENDOR" ? !!d.vendor_id : !!d.game_company_id),

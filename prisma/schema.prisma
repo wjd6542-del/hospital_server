@@ -374,6 +374,7 @@ model SupportTicket {
   updated_at DateTime @updatedAt
 
   messages SupportMessage[]
+  tags     Tag[]
 
   @@index([party])
   @@index([status])
@@ -408,6 +409,8 @@ model Faq {
   created_at DateTime @default(now())
   updated_at DateTime @updatedAt
 
+  tags Tag[]
+
   @@index([category])
   @@index([sort])
 }
@@ -420,6 +423,22 @@ model FaqCategory {
   is_active  Boolean  @default(true)
   created_at DateTime @default(now())
   updated_at DateTime @updatedAt
+
+  @@index([sort])
+}
+
+/// 태그 (CS 관리 공통 — 응대/FAQ 다중 태그, 환경설정에서 관리)
+model Tag {
+  id         Int      @id @default(autoincrement())
+  name       String   @unique // 태그명
+  color      String   @default("#7a5cff") // 칩 색상(hex)
+  sort       Int      @default(0)
+  is_active  Boolean  @default(true)
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  tickets SupportTicket[]
+  faqs    Faq[]
 
   @@index([sort])
 }

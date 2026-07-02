@@ -5,6 +5,7 @@ import { parsePage, buildPageResult } from "../utils/pagination.js";
 const INCLUDE = {
   game_company: { select: { id: true, name: true } },
   vendor: { select: { id: true, name: true } },
+  tags: { select: { id: true, name: true, color: true } },
   _count: { select: { messages: true } },
 };
 
@@ -22,6 +23,7 @@ function shape(t) {
     priority: t.priority,
     assignee_id: t.assignee_id,
     created_by: t.created_by,
+    tags: t.tags || [],
     message_count: t._count?.messages ?? 0,
     created_at: t.created_at,
     updated_at: t.updated_at,
@@ -35,6 +37,7 @@ export default {
     if (params.status) where.status = params.status;
     if (params.vendor_id) where.vendor_id = params.vendor_id;
     if (params.game_company_id) where.game_company_id = params.game_company_id;
+    if (params.tag_ids?.length) where.tags = { some: { id: { in: params.tag_ids } } };
     if (params.q) where.title = { contains: params.q };
     const { page, limit, skip } = parsePage(params);
     const [rows, total] = await Promise.all([
@@ -85,14 +88,19 @@ export default {
       priority: data.priority,
       assignee_id: data.assignee_id ?? null,
     };
+    const tagIds = Array.isArray(data.tag_ids) ? data.tag_ids : null;
     if (data.id) {
       const ex = await prisma.supportTicket.findUnique({ where: { id: data.id } });
       if (!ex) throw new AppError("응대 건을 찾을 수 없습니다.", 404, "NOT_FOUND");
-      return shape(await prisma.supportTicket.update({ where: { id: data.id }, data: payload, include: INCLUDE }));
+      return shape(await prisma.supportTicket.update({
+        where: { id: data.id },
+        data: { ...payload, ...(tagIds ? { tags: { set: tagIds.map((id) => ({ id })) } } : {}) },
+        include: INCLUDE,
+      }));
     }
     return shape(
       await prisma.supportTicket.create({
-        data: { ...payload, created_by: user?.id ?? null },
+        data: { ...payload, created_by: user?.id ?? null, ...(tagIds ? { tags: { connect: tagIds.map((id) => ({ id })) } } : {}) },
         include: INCLUDE,
       }),
     );

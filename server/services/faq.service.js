@@ -3,15 +3,16 @@ import AppError from "../errors/AppError.js";
 import { parsePage, buildPageResult } from "../utils/pagination.js";
 
 export default {
-  async list({ category, categories, q, is_active, page, limit } = {}) {
+  async list({ category, categories, tag_ids, q, is_active, page, limit } = {}) {
     const where = {};
     if (typeof is_active === "boolean") where.is_active = is_active;
     if (categories?.length) where.category = { in: categories };
     else if (category) where.category = category;
+    if (tag_ids?.length) where.tags = { some: { id: { in: tag_ids } } };
     if (q) where.OR = [{ question: { contains: q } }, { answer: { contains: q } }];
     const { page: p, limit: l, skip } = parsePage({ page, limit }, { defaultLimit: 10 });
     const [rows, total] = await Promise.all([
-      prisma.faq.findMany({ where, orderBy: [{ sort: "asc" }, { id: "desc" }], skip, take: l }),
+      prisma.faq.findMany({ where, include: { tags: { select: { id: true, name: true, color: true } } }, orderBy: [{ sort: "asc" }, { id: "desc" }], skip, take: l }),
       prisma.faq.count({ where }),
     ]);
     return buildPageResult({ rows, total, page: p, limit: l });
@@ -30,13 +31,21 @@ export default {
   },
 
   async save(data) {
-    const { id, ...fields } = data;
+    const { id, tag_ids, ...fields } = data;
+    const tagIds = Array.isArray(tag_ids) ? tag_ids : null;
     if (id) {
       const ex = await prisma.faq.findUnique({ where: { id } });
       if (!ex) throw new AppError("FAQ를 찾을 수 없습니다.", 404, "NOT_FOUND");
-      return prisma.faq.update({ where: { id }, data: fields });
+      return prisma.faq.update({
+        where: { id },
+        data: { ...fields, ...(tagIds ? { tags: { set: tagIds.map((tid) => ({ id: tid })) } } : {}) },
+        include: { tags: true },
+      });
     }
-    return prisma.faq.create({ data: fields });
+    return prisma.faq.create({
+      data: { ...fields, ...(tagIds ? { tags: { connect: tagIds.map((tid) => ({ id: tid })) } } : {}) },
+      include: { tags: true },
+    });
   },
 
   async remove(id) {
