@@ -4,8 +4,11 @@ export const idSchema = z.object({ id: z.coerce.number().int().positive() });
 
 export const listSchema = z.object({
   category: z.string().trim().optional(),
+  categories: z.array(z.string()).optional(),
   q: z.string().trim().optional(),
   is_active: z.boolean().optional(),
+  page: z.coerce.number().int().optional(),
+  limit: z.coerce.number().int().optional(),
 });
 
 export const saveSchema = z.object({

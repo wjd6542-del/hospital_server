@@ -1,5 +1,6 @@
 import prisma from "../lib/prisma.js";
 import AppError from "../errors/AppError.js";
+import { parsePage } from "../utils/pagination.js";
 
 function canWrite(board, user) {
   if (!user) return false;
@@ -24,27 +25,29 @@ function shape(p) {
 }
 
 export default {
-  /** 무한 스크롤: 공지는 첫 로드(cursor 없음)에만, 일반글은 id desc 커서 */
-  async list({ board_id, cursor, take = 20 }) {
-    const posts = await prisma.post.findMany({
-      where: { board_id, is_notice: false },
-      include: LIST_INCLUDE,
-      orderBy: { id: "desc" },
-      take: take + 1,
-      ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
-    });
-    const hasMore = posts.length > take;
-    const rows = hasMore ? posts.slice(0, take) : posts;
-    let notices = [];
-    if (!cursor) {
-      notices = await prisma.post.findMany({
-        where: { board_id, is_notice: true }, include: LIST_INCLUDE, orderBy: { id: "desc" },
-      });
-    }
+  /** 페이지네이션: 공지는 1페이지에만 상단 고정, 일반글은 id desc 페이지 */
+  async list({ board_id, page, limit }) {
+    const { page: p, limit: l, skip } = parsePage({ page, limit }, { defaultLimit: 20 });
+    const [posts, total, notices] = await Promise.all([
+      prisma.post.findMany({
+        where: { board_id, is_notice: false },
+        include: LIST_INCLUDE,
+        orderBy: { id: "desc" },
+        skip,
+        take: l,
+      }),
+      prisma.post.count({ where: { board_id, is_notice: false } }),
+      p === 1
+        ? prisma.post.findMany({ where: { board_id, is_notice: true }, include: LIST_INCLUDE, orderBy: { id: "desc" } })
+        : Promise.resolve([]),
+    ]);
     return {
       notices: notices.map(shape),
-      rows: rows.map(shape),
-      nextCursor: hasMore ? rows[rows.length - 1].id : null,
+      rows: posts.map(shape),
+      total,
+      page: p,
+      limit: l,
+      totalPages: l > 0 ? Math.ceil(total / l) : 0,
     };
   },
 

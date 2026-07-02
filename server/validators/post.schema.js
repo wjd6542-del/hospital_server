@@ -2,8 +2,8 @@ import { z } from "zod";
 export const idSchema = z.object({ id: z.coerce.number().int().positive() });
 export const listSchema = z.object({
   board_id: z.coerce.number().int().positive(),
-  cursor: z.coerce.number().int().positive().nullable().optional(),
-  take: z.coerce.number().int().min(1).max(50).default(20),
+  page: z.coerce.number().int().optional(),
+  limit: z.coerce.number().int().optional(),
 });
 const attachment = z.object({
   path: z.string(),

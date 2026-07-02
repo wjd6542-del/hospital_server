@@ -398,7 +398,7 @@ model SupportMessage {
 /// 자주 하는 질문 (FAQ)
 model Faq {
   id         Int      @id @default(autoincrement())
-  category   String? // 분류
+  category   String? // 분류 (FaqCategory.name 참조 문자열)
   question   String
   answer     String   @db.LongText
   sort       Int      @default(0)
@@ -409,6 +409,18 @@ model Faq {
   updated_at DateTime @updatedAt
 
   @@index([category])
+  @@index([sort])
+}
+
+/// FAQ 분류 (환경설정에서 관리)
+model FaqCategory {
+  id         Int      @id @default(autoincrement())
+  name       String   @unique // 분류명
+  sort       Int      @default(0)
+  is_active  Boolean  @default(true)
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
   @@index([sort])
 }
 
