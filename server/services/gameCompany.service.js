@@ -6,6 +6,25 @@ function shape(g) {
   return { ...g, fee_rate: g.fee_rate == null ? null : Number(g.fee_rate) };
 }
 
+/** 다음 자동 코드 (GC0001, GC0002 …) */
+async function nextCode() {
+  const last = await prisma.gameCompany.findFirst({
+    where: { code: { startsWith: "GC" } },
+    orderBy: { code: "desc" },
+    select: { code: true },
+  });
+  let n = 1;
+  const m = last?.code?.match(/(\d+)$/);
+  if (m) n = parseInt(m[1], 10) + 1;
+  for (let i = 0; i < 50; i++) {
+    const code = "GC" + String(n).padStart(4, "0");
+    const dup = await prisma.gameCompany.findUnique({ where: { code } });
+    if (!dup) return code;
+    n++;
+  }
+  return "GC" + Date.now();
+}
+
 export default {
   async list({ q, is_active, page, limit } = {}) {
     const where = {};
@@ -52,6 +71,7 @@ export default {
       if (!ex) throw new AppError("게임사를 찾을 수 없습니다.", 404, "NOT_FOUND");
       return shape(await prisma.gameCompany.update({ where: { id }, data: fields }));
     }
+    if (!fields.code) fields.code = await nextCode();
     return shape(await prisma.gameCompany.create({ data: fields }));
   },
 
