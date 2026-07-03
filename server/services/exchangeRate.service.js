@@ -1,8 +1,9 @@
 import prisma from "../lib/prisma.js";
 import { parsePage, buildPageResult } from "../utils/pagination.js";
 
-const CODES = ["usd", "jpy", "cny", "vnd", "eur", "gbp"];
-const SOURCE = "open.er-api.com";
+const CODES = ["usd", "jpy", "cny", "vnd", "eur", "gbp", "twd", "php"];
+const COINS = { btc: "bitcoin", eth: "ethereum", usdt: "tether" };
+const SOURCE = "open.er-api.com + coingecko";
 
 function num(v) {
   return v == null ? null : Number(v);
@@ -19,6 +20,11 @@ function shape(r) {
     vnd: num(r.vnd),
     eur: num(r.eur),
     gbp: num(r.gbp),
+    twd: num(r.twd),
+    php: num(r.php),
+    btc: num(r.btc),
+    eth: num(r.eth),
+    usdt: num(r.usdt),
     source: r.source,
     created_at: r.created_at,
   };
@@ -43,6 +49,21 @@ export default {
       const rate = json.rates[c.toUpperCase()];
       data[c] = rate ? 1 / rate : null;
     }
+
+    // 코인 시세(원) — CoinGecko (실패해도 환율은 저장)
+    try {
+      const ids = Object.values(COINS).join(",");
+      const cres = await fetch(`https://api.coingecko.com/api/v3/simple/price?ids=${ids}&vs_currencies=krw`);
+      if (cres.ok) {
+        const cj = await cres.json();
+        for (const [key, id] of Object.entries(COINS)) {
+          data[key] = cj[id]?.krw ?? null;
+        }
+      }
+    } catch (e) {
+      console.error("💱 코인 시세 수집 실패:", e.message);
+    }
+
     const date = startOfDay();
     const existing = await prisma.exchangeRate.findUnique({ where: { date } });
     if (existing) {
