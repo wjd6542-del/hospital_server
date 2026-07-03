@@ -3,9 +3,8 @@ import AppError from "../errors/AppError.js";
 import { parsePage, buildPageResult } from "../utils/pagination.js";
 
 const INCLUDE = {
-  game_company: { select: { id: true, name: true } },
-  vendor: { select: { id: true, name: true } },
-  solution_company: { select: { id: true, name: true } },
+  desk: { select: { id: true, name: true, code: true } },
+  target: { select: { id: true, name: true } },
   tags: { select: { id: true, name: true, color: true } },
   _count: { select: { messages: true } },
 };
@@ -13,13 +12,11 @@ const INCLUDE = {
 function shape(t) {
   return {
     id: t.id,
-    party: t.party,
-    vendor_id: t.vendor_id,
-    vendor_name: t.vendor?.name || null,
-    game_company_id: t.game_company_id,
-    game_company_name: t.game_company?.name || null,
-    solution_company_id: t.solution_company_id,
-    solution_company_name: t.solution_company?.name || null,
+    desk_id: t.desk_id,
+    desk_code: t.desk?.code || null,
+    desk_name: t.desk?.name || null,
+    target_id: t.target_id,
+    target_name: t.target?.name || null,
     title: t.title,
     category: t.category,
     status: t.status,
@@ -36,11 +33,9 @@ function shape(t) {
 export default {
   async list(params = {}) {
     const where = {};
-    if (params.party) where.party = params.party;
+    if (params.desk_id) where.desk_id = params.desk_id;
+    if (params.target_id) where.target_id = params.target_id;
     if (params.status) where.status = params.status;
-    if (params.vendor_id) where.vendor_id = params.vendor_id;
-    if (params.game_company_id) where.game_company_id = params.game_company_id;
-    if (params.solution_company_id) where.solution_company_id = params.solution_company_id;
     if (params.tag_ids?.length) where.tags = { some: { id: { in: params.tag_ids } } };
     if (params.q) where.title = { contains: params.q };
     if (params.date_from || params.date_to) {
@@ -56,10 +51,10 @@ export default {
     return buildPageResult({ rows: rows.map(shape), total, page, limit });
   },
 
-  /** 미해결(접수/처리중) 응대 알림 — 양측 합산 + 파티별 카운트 */
+  /** 미해결(접수/처리중) 응대 알림 — 유형(desk)별 카운트 */
   async alerts({ limit = 20 } = {}) {
     const where = { status: { in: ["OPEN", "IN_PROGRESS"] } };
-    const [rows, total, byParty] = await Promise.all([
+    const [rows, total, byDesk] = await Promise.all([
       prisma.supportTicket.findMany({
         where,
         include: INCLUDE,
@@ -67,31 +62,27 @@ export default {
         take: limit,
       }),
       prisma.supportTicket.count({ where }),
-      prisma.supportTicket.groupBy({ by: ["party"], where, _count: { _all: true } }),
+      prisma.supportTicket.groupBy({ by: ["desk_id"], where, _count: { _all: true } }),
     ]);
-    const counts = { VENDOR: 0, GAME_COMPANY: 0, SOLUTION: 0 };
-    for (const g of byParty) counts[g.party] = g._count._all;
+    const counts = {};
+    for (const g of byDesk) counts[g.desk_id] = g._count._all;
     return { rows: rows.map(shape), total, counts };
   },
 
   async get(id) {
     const t = await prisma.supportTicket.findUnique({
       where: { id },
-      include: {
-        ...INCLUDE,
-        messages: { orderBy: { id: "asc" } },
-      },
+      include: { ...INCLUDE, messages: { orderBy: { id: "asc" } } },
     });
     if (!t) throw new AppError("응대 건을 찾을 수 없습니다.", 404, "NOT_FOUND");
     return { ...shape(t), messages: t.messages };
   },
 
   async save(data, user) {
+    if (!data.desk_id) throw new AppError("응대 유형을 선택하세요.", 400, "INVALID_DESK");
     const payload = {
-      party: data.party,
-      vendor_id: data.party === "VENDOR" ? data.vendor_id : null,
-      game_company_id: data.party === "GAME_COMPANY" ? data.game_company_id : null,
-      solution_company_id: data.party === "SOLUTION" ? data.solution_company_id : null,
+      desk_id: data.desk_id,
+      target_id: data.target_id ?? null,
       title: data.title,
       category: data.category ?? null,
       status: data.status,
@@ -122,7 +113,6 @@ export default {
     return shape(await prisma.supportTicket.update({ where: { id }, data: { status }, include: INCLUDE }));
   },
 
-  /** 상태 일괄 변경 */
   async bulkStatus({ ids, status }) {
     if (!ids?.length) return { ok: true, count: 0 };
     const res = await prisma.supportTicket.updateMany({ where: { id: { in: ids } }, data: { status } });
@@ -140,7 +130,6 @@ export default {
         is_internal: data.is_internal,
       },
     });
-    // 새 메시지가 달리면 종료 건은 다시 처리중으로
     if (t.status === "CLOSED" || t.status === "RESOLVED") {
       await prisma.supportTicket.update({ where: { id: t.id }, data: { status: "IN_PROGRESS" } });
     } else {
@@ -150,7 +139,7 @@ export default {
   },
 
   async remove(id) {
-    await prisma.supportTicket.delete({ where: { id } }); // messages cascade
+    await prisma.supportTicket.delete({ where: { id } });
     return { ok: true };
   },
 };

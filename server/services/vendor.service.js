@@ -56,19 +56,7 @@ export default {
       select: { id: true, name: true, code: true, parent_id: true, is_active: true },
     });
     const byId = new Map();
-    rows.forEach((r) => byId.set(r.id, { ...r, children: [], open_count: 0, progress_count: 0 }));
-    // 상태별 응대 카운트 (접수/처리중 분리)
-    const counts = await prisma.supportTicket.groupBy({
-      by: ["vendor_id", "status"],
-      where: { status: { in: ["OPEN", "IN_PROGRESS"] }, vendor_id: { not: null } },
-      _count: { _all: true },
-    });
-    for (const c of counts) {
-      const n = byId.get(c.vendor_id);
-      if (!n) continue;
-      if (c.status === "OPEN") n.open_count = c._count._all;
-      else if (c.status === "IN_PROGRESS") n.progress_count = c._count._all;
-    }
+    rows.forEach((r) => byId.set(r.id, { ...r, children: [] }));
     const roots = [];
     for (const node of byId.values()) {
       if (node.parent_id && byId.has(node.parent_id)) byId.get(node.parent_id).children.push(node);
@@ -148,13 +136,12 @@ export default {
   async remove(id) {
     const kids = await prisma.vendor.count({ where: { parent_id: id } });
     if (kids > 0) throw new AppError("하위 업체가 있어 삭제할 수 없습니다.", 400, "HAS_CHILDREN");
-    const [ledger, settlement, ticket] = await Promise.all([
+    const [ledger, settlement] = await Promise.all([
       prisma.ledgerEntry.count({ where: { vendor_id: id } }),
       prisma.settlement.count({ where: { vendor_id: id } }),
-      prisma.supportTicket.count({ where: { vendor_id: id } }),
     ]);
-    if (ledger || settlement || ticket)
-      throw new AppError("장부·정산·응대 이력이 있어 삭제할 수 없습니다. 비활성 처리하세요.", 400, "IN_USE");
+    if (ledger || settlement)
+      throw new AppError("장부·정산 이력이 있어 삭제할 수 없습니다. 비활성 처리하세요.", 400, "IN_USE");
     await prisma.vendor.delete({ where: { id } });
     return { ok: true };
   },
