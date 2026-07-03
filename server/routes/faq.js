@@ -12,6 +12,7 @@ function ensureAuth(user) {
 export default async function faqRoutes(app) {
   app.post("/list", async (req) => service.list(validate(listSchema, req.body || {})));
   app.post("/categories", async () => service.categories());
+  app.post("/popular", async (req) => service.popular(req.body || {}));
   app.post("/get", async (req) => { const { id } = validate(idSchema, req.body); return service.get(id); });
   app.post("/save", async (req) => { ensureAuth(req.user); return service.save(validate(saveSchema, req.body)); });
   app.post("/delete", async (req) => { ensureAuth(req.user); const { id } = validate(idSchema, req.body); return service.remove(id); });

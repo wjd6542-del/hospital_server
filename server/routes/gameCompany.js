@@ -11,6 +11,7 @@ function ensureAdmin(user) {
 /** 게임사 설정 (/api/gameCompany) */
 export default async function gameCompanyRoutes(app) {
   app.post("/list", async (req) => service.list(validate(listSchema, req.body || {})));
+  app.post("/tree", async () => service.tree());
   app.post("/options", async () => service.options());
   app.post("/get", async (req) => { const { id } = validate(idSchema, req.body); return service.get(id); });
   app.post("/save", async (req) => { ensureAdmin(req.user); return service.save(validate(saveSchema, req.body)); });

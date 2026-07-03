@@ -52,6 +52,22 @@ export default {
     });
   },
 
+  /** 상하위 트리 */
+  async tree() {
+    const rows = await prisma.gameCompany.findMany({
+      orderBy: [{ sort: "asc" }, { id: "asc" }],
+      select: { id: true, name: true, code: true, parent_id: true, is_active: true },
+    });
+    const byId = new Map();
+    rows.forEach((r) => byId.set(r.id, { ...r, children: [] }));
+    const roots = [];
+    for (const node of byId.values()) {
+      if (node.parent_id && byId.has(node.parent_id)) byId.get(node.parent_id).children.push(node);
+      else roots.push(node);
+    }
+    return roots;
+  },
+
   async get(id) {
     const g = await prisma.gameCompany.findUnique({ where: { id } });
     if (!g) throw new AppError("게임사를 찾을 수 없습니다.", 404, "NOT_FOUND");
@@ -60,6 +76,19 @@ export default {
 
   async save(data) {
     const { id, ...fields } = data;
+
+    if (fields.parent_id) {
+      if (fields.parent_id === id)
+        throw new AppError("자기 자신을 상위로 지정할 수 없습니다.", 400, "INVALID_PARENT");
+      if (id) {
+        let cur = await prisma.gameCompany.findUnique({ where: { id: fields.parent_id }, select: { parent_id: true } });
+        while (cur?.parent_id) {
+          if (cur.parent_id === id) throw new AppError("하위 게임사를 상위로 지정할 수 없습니다.", 400, "CYCLE");
+          cur = await prisma.gameCompany.findUnique({ where: { id: cur.parent_id }, select: { parent_id: true } });
+        }
+      }
+    }
+
     if (fields.code) {
       const dup = await prisma.gameCompany.findFirst({
         where: { code: fields.code, ...(id ? { id: { not: id } } : {}) },
@@ -76,6 +105,8 @@ export default {
   },
 
   async remove(id) {
+    const kids = await prisma.gameCompany.count({ where: { parent_id: id } });
+    if (kids > 0) throw new AppError("하위 게임사가 있어 삭제할 수 없습니다.", 400, "HAS_CHILDREN");
     const [ledger, settlement, ticket] = await Promise.all([
       prisma.ledgerEntry.count({ where: { game_company_id: id } }),
       prisma.settlement.count({ where: { game_company_id: id } }),

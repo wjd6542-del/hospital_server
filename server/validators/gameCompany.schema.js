@@ -20,4 +20,5 @@ export const saveSchema = z.object({
   memo: z.string().trim().nullable().optional(),
   is_active: z.boolean().default(true),
   sort: z.coerce.number().int().default(0),
+  parent_id: z.coerce.number().int().positive().nullable().optional(),
 });

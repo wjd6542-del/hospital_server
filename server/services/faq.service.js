@@ -12,10 +12,20 @@ export default {
     if (q) where.OR = [{ question: { contains: q } }, { answer: { contains: q } }];
     const { page: p, limit: l, skip } = parsePage({ page, limit }, { defaultLimit: 10 });
     const [rows, total] = await Promise.all([
-      prisma.faq.findMany({ where, include: { tags: { select: { id: true, name: true, color: true } } }, orderBy: [{ sort: "asc" }, { id: "desc" }], skip, take: l }),
+      prisma.faq.findMany({ where, include: { tags: { select: { id: true, name: true, color: true } } }, orderBy: [{ is_pinned: "desc" }, { sort: "asc" }, { id: "desc" }], skip, take: l }),
       prisma.faq.count({ where }),
     ]);
     return buildPageResult({ rows, total, page: p, limit: l });
+  },
+
+  /** 인기 FAQ (조회수 상위) */
+  async popular({ limit = 10 } = {}) {
+    return prisma.faq.findMany({
+      where: { is_active: true },
+      orderBy: [{ view_count: "desc" }, { id: "desc" }],
+      take: Math.min(Math.max(1, Number(limit) || 10), 20),
+      select: { id: true, question: true, category: true, view_count: true },
+    });
   },
 
   /** 카테고리 목록(중복 제거) */

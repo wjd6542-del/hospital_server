@@ -259,6 +259,10 @@ model GameCompany {
   is_active     Boolean @default(true)
   sort          Int     @default(0)
 
+  parent_id Int? // 상위 게임사 — null 이면 최상위
+  parent    GameCompany?  @relation("GameCompanyTree", fields: [parent_id], references: [id])
+  children  GameCompany[] @relation("GameCompanyTree")
+
   created_at DateTime @default(now())
   updated_at DateTime @updatedAt
 
@@ -267,6 +271,7 @@ model GameCompany {
   tickets       SupportTicket[]
 
   @@index([sort])
+  @@index([parent_id])
 }
 
 /// 업체 (사용대금을 회수하는 대상) — 상하위(총판-대리점) 계층
@@ -398,11 +403,13 @@ model SupportMessage {
 
 /// 자주 하는 질문 (FAQ)
 model Faq {
-  id         Int      @id @default(autoincrement())
-  category   String? // 분류 (FaqCategory.name 참조 문자열)
-  question   String
-  answer     String   @db.LongText
+  id            Int     @id @default(autoincrement())
+  category      String? // 분류 (FaqCategory.name 참조 문자열)
+  question      String // 질문 제목
+  question_body String? @db.LongText // 질문 내용(HTML)
+  answer        String  @db.LongText
   sort       Int      @default(0)
+  is_pinned  Boolean  @default(false) // 상단 고정
   is_active  Boolean  @default(true)
   view_count Int      @default(0)
 
