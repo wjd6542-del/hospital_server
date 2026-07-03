@@ -2,7 +2,18 @@ import prisma from "../lib/prisma.js";
 import { parsePage, buildPageResult } from "../utils/pagination.js";
 
 const CODES = ["usd", "jpy", "cny", "vnd", "eur", "gbp", "twd", "php"];
-const COINS = { btc: "bitcoin", eth: "ethereum", usdt: "tether" };
+const COINS = {
+  btc: "bitcoin",
+  eth: "ethereum",
+  usdt: "tether",
+  bnb: "binancecoin",
+  xrp: "ripple",
+  sol: "solana",
+  usdc: "usd-coin",
+  doge: "dogecoin",
+  ada: "cardano",
+  trx: "tron",
+};
 const SOURCE = "open.er-api.com + coingecko";
 
 function num(v) {
@@ -25,6 +36,13 @@ function shape(r) {
     btc: num(r.btc),
     eth: num(r.eth),
     usdt: num(r.usdt),
+    bnb: num(r.bnb),
+    xrp: num(r.xrp),
+    sol: num(r.sol),
+    usdc: num(r.usdc),
+    doge: num(r.doge),
+    ada: num(r.ada),
+    trx: num(r.trx),
     source: r.source,
     created_at: r.created_at,
   };

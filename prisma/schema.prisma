@@ -593,6 +593,13 @@ model ExchangeRate {
   btc  Decimal? @db.Decimal(18, 4) // 비트코인
   eth  Decimal? @db.Decimal(18, 4) // 이더리움
   usdt Decimal? @db.Decimal(18, 4) // 테더
+  bnb  Decimal? @db.Decimal(18, 4) // 바이낸스 코인
+  xrp  Decimal? @db.Decimal(18, 4) // 리플
+  sol  Decimal? @db.Decimal(18, 4) // 솔라나
+  usdc Decimal? @db.Decimal(18, 4) // USD Coin
+  doge Decimal? @db.Decimal(18, 4) // 도지코인
+  ada  Decimal? @db.Decimal(18, 4) // 카르다노(에이다)
+  trx  Decimal? @db.Decimal(18, 4) // 트론
 
   source     String? // 데이터 출처
   created_at DateTime @default(now())
