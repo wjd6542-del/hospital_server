@@ -79,7 +79,20 @@ export default {
   async remove(id) {
     const ex = await prisma.ledgerEntry.findUnique({ where: { id } });
     if (!ex) throw new AppError("장부 항목을 찾을 수 없습니다.", 404, "NOT_FOUND");
-    if (ex.settlement_id) throw new AppError("정산에서 생성된 항목은 삭제할 수 없습니다.", 400, "FROM_SETTLEMENT");
+    // 정산에서 파생된 항목은 삭제 시 연결된 정산의 처리액을 롤백
+    if (ex.settlement_id) {
+      await prisma.$transaction(async (tx) => {
+        const s = await tx.settlement.findUnique({ where: { id: ex.settlement_id } });
+        await tx.ledgerEntry.delete({ where: { id } });
+        if (s) {
+          const settled = Math.max(0, Number(s.settled_amount) - Number(ex.amount));
+          const amount = Number(s.amount);
+          const status = settled <= 0 ? "PENDING" : settled >= amount ? "DONE" : "PARTIAL";
+          await tx.settlement.update({ where: { id: s.id }, data: { settled_amount: settled, status } });
+        }
+      });
+      return { ok: true, rolledBack: true };
+    }
     await prisma.ledgerEntry.delete({ where: { id } });
     return { ok: true };
   },
