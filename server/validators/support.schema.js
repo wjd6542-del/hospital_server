@@ -36,6 +36,11 @@ export const statusSchema = z.object({
   status: z.enum(["OPEN", "IN_PROGRESS", "RESOLVED", "CLOSED"]),
 });
 
+export const bulkStatusSchema = z.object({
+  ids: z.array(z.coerce.number().int().positive()).min(1, "선택된 항목이 없습니다"),
+  status: z.enum(["OPEN", "IN_PROGRESS", "RESOLVED", "CLOSED"]),
+});
+
 export const messageSchema = z.object({
   ticket_id: z.coerce.number().int().positive(),
   content: z.string().trim().min(1, "내용을 입력하세요"),

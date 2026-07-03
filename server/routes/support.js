@@ -1,6 +1,6 @@
 import service from "../services/support.service.js";
 import { validate } from "../plugins/validator.plugin.js";
-import { idSchema, listSchema, saveSchema, statusSchema, messageSchema } from "../validators/support.schema.js";
+import { idSchema, listSchema, saveSchema, statusSchema, bulkStatusSchema, messageSchema } from "../validators/support.schema.js";
 
 function ensureAuth(user) {
   if (!user?.id) {
@@ -15,6 +15,7 @@ export default async function supportRoutes(app) {
   app.post("/get", async (req) => { const { id } = validate(idSchema, req.body); return service.get(id); });
   app.post("/save", async (req) => { ensureAuth(req.user); return service.save(validate(saveSchema, req.body), req.user); });
   app.post("/status", async (req) => { ensureAuth(req.user); return service.setStatus(validate(statusSchema, req.body)); });
+  app.post("/bulkStatus", async (req) => { ensureAuth(req.user); return service.bulkStatus(validate(bulkStatusSchema, req.body)); });
   app.post("/message", async (req) => { ensureAuth(req.user); return service.addMessage(validate(messageSchema, req.body), req.user); });
   app.post("/delete", async (req) => { ensureAuth(req.user); const { id } = validate(idSchema, req.body); return service.remove(id); });
 }

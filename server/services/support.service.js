@@ -112,6 +112,13 @@ export default {
     return shape(await prisma.supportTicket.update({ where: { id }, data: { status }, include: INCLUDE }));
   },
 
+  /** 상태 일괄 변경 */
+  async bulkStatus({ ids, status }) {
+    if (!ids?.length) return { ok: true, count: 0 };
+    const res = await prisma.supportTicket.updateMany({ where: { id: { in: ids } }, data: { status } });
+    return { ok: true, count: res.count };
+  },
+
   async addMessage(data, user) {
     const t = await prisma.supportTicket.findUnique({ where: { id: data.ticket_id } });
     if (!t) throw new AppError("응대 건을 찾을 수 없습니다.", 404, "NOT_FOUND");
