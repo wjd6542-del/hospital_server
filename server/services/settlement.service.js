@@ -56,6 +56,31 @@ export default {
     return buildPageResult({ rows: rows.map(shape), total, page, limit });
   },
 
+  /** 올해(1월~현재월) 월별 정산 처리액 (회수=업체 / 지급=게임사) */
+  async yearChart({ year } = {}) {
+    const now = new Date();
+    const y = Number(year) || now.getFullYear();
+    const start = new Date(y, 0, 1, 0, 0, 0);
+    const end = y === now.getFullYear() ? now : new Date(y, 11, 31, 23, 59, 59, 999);
+    const rows = await prisma.settlement.findMany({
+      where: { period_start: { gte: start, lte: end } },
+      select: { type: true, settled_amount: true, period_start: true },
+    });
+    const lastMonth = y === now.getFullYear() ? now.getMonth() + 1 : 12;
+    const months = [];
+    for (let m = 1; m <= lastMonth; m++) months.push({ month: m, label: `${m}월`, collection: 0, payment: 0, settled: 0 });
+    for (const r of rows) {
+      const m = new Date(r.period_start).getMonth() + 1;
+      const bucket = months[m - 1];
+      if (!bucket) continue;
+      const v = Number(r.settled_amount) || 0;
+      bucket.settled += v;
+      if (r.type === "VENDOR") bucket.collection += v;
+      else if (r.type === "GAME_COMPANY") bucket.payment += v;
+    }
+    return { year: y, months };
+  },
+
   async get(id) {
     const s = await prisma.settlement.findUnique({
       where: { id },

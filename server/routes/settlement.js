@@ -11,6 +11,7 @@ function ensureAuth(user) {
 /** 정산 (/api/settlement) — 업체 정산(회수) / 게임사 정산(지급) */
 export default async function settlementRoutes(app) {
   app.post("/list", async (req) => service.list(validate(listSchema, req.body || {})));
+  app.post("/yearChart", async (req) => service.yearChart(req.body || {}));
   app.post("/get", async (req) => { const { id } = validate(idSchema, req.body); return service.get(id); });
   app.post("/save", async (req) => { ensureAuth(req.user); return service.save(validate(saveSchema, req.body), req.user); });
   app.post("/settle", async (req) => { ensureAuth(req.user); return service.settle(validate(settleSchema, req.body), req.user); });
