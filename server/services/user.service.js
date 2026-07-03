@@ -231,15 +231,12 @@ export default {
       throw new AppError("중복된 유저입니다.", 400, "INVALID_USER");
     }
 
-    // 2. 중복 체크
-    const existEmail = await prisma.user.findFirst({
-      where: {
-        email,
-      },
-    });
-
-    if (existEmail) {
-      throw new AppError("중복된 이메일 입니다.", 400, "INVALID_USER");
+    // 2. 이메일 중복 체크 (이메일이 있을 때만)
+    if (email) {
+      const existEmail = await prisma.user.findFirst({ where: { email } });
+      if (existEmail) {
+        throw new AppError("중복된 이메일 입니다.", 400, "INVALID_USER");
+      }
     }
 
     // 3. 비밀번호 암호화
@@ -251,7 +248,7 @@ export default {
         username,
         password: hash,
         name,
-        email,
+        email: email ?? null,
         role_id,
         is_active,
       },
@@ -267,13 +264,13 @@ export default {
   async update(data) {
     const { name, username, email, role_id, is_active } = data;
 
-    // 4. 회원 저장
+    // 4. 회원 저장 (email 미전달 시 기존 값 유지)
     await prisma.user.update({
       where: { id: data.id },
       data: {
         username,
         name,
-        email,
+        ...(email !== undefined ? { email } : {}),
         role_id,
         is_active,
       },

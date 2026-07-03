@@ -19,10 +19,10 @@ export const createSchema = z
       .min(1, "아이디를 입력하세요")
       .regex(/^[A-Za-z0-9]+$/, "아이디는 영문과 숫자만 가능합니다"),
 
-    email: z
-      .string()
-      .min(1, "이메일을 입력하세요")
-      .email("올바른 이메일 형식이 아닙니다"),
+    email: z.preprocess(
+      (v) => (v === "" || v == null ? undefined : v),
+      z.string().email("올바른 이메일 형식이 아닙니다").optional(),
+    ),
 
     password: z
       .string()
@@ -55,10 +55,10 @@ export const updateSchema = z.object({
     .min(1, "아이디를 입력하세요")
     .regex(/^[A-Za-z0-9]+$/, "아이디는 영문과 숫자만 가능합니다"),
 
-  email: z
-    .string()
-    .min(1, "이메일을 입력하세요")
-    .email("올바른 이메일 형식이 아닙니다"),
+  email: z.preprocess(
+    (v) => (v === "" || v == null ? undefined : v),
+    z.string().email("올바른 이메일 형식이 아닙니다").optional(),
+  ),
 
   // ✅ 권한 (number)
   role_id: z.coerce.number().min(1, "권한을 선택하세요"),
