@@ -117,6 +117,34 @@ export default {
     return prisma.vendor.create({ data: fields });
   },
 
+  /** 드래그 순서/상위 변경: id 를 parent_id 하위에서 before_id 앞에 배치(없으면 맨 뒤) */
+  async reorder({ id, parent_id, before_id }) {
+    const pid = parent_id ?? null;
+    if (pid) {
+      if (pid === id) throw new AppError("자기 자신을 상위로 지정할 수 없습니다.", 400, "INVALID_PARENT");
+      let cur = await prisma.vendor.findUnique({ where: { id: pid }, select: { parent_id: true } });
+      while (cur?.parent_id) {
+        if (cur.parent_id === id) throw new AppError("하위 업체를 상위로 지정할 수 없습니다.", 400, "CYCLE");
+        cur = await prisma.vendor.findUnique({ where: { id: cur.parent_id }, select: { parent_id: true } });
+      }
+    }
+    await prisma.vendor.update({ where: { id }, data: { parent_id: pid } });
+    const sibs = await prisma.vendor.findMany({
+      where: { parent_id: pid, id: { not: id } },
+      orderBy: [{ sort: "asc" }, { id: "asc" }],
+      select: { id: true },
+    });
+    const orderIds = [];
+    let inserted = false;
+    for (const s of sibs) {
+      if (before_id && s.id === before_id) { orderIds.push(id); inserted = true; }
+      orderIds.push(s.id);
+    }
+    if (!inserted) orderIds.push(id);
+    await prisma.$transaction(orderIds.map((sid, i) => prisma.vendor.update({ where: { id: sid }, data: { sort: i } })));
+    return { ok: true };
+  },
+
   async remove(id) {
     const kids = await prisma.vendor.count({ where: { parent_id: id } });
     if (kids > 0) throw new AppError("하위 업체가 있어 삭제할 수 없습니다.", 400, "HAS_CHILDREN");

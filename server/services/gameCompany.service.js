@@ -115,6 +115,34 @@ export default {
     return shape(await prisma.gameCompany.create({ data: fields }));
   },
 
+  /** 드래그 순서/상위 변경 */
+  async reorder({ id, parent_id, before_id }) {
+    const pid = parent_id ?? null;
+    if (pid) {
+      if (pid === id) throw new AppError("자기 자신을 상위로 지정할 수 없습니다.", 400, "INVALID_PARENT");
+      let cur = await prisma.gameCompany.findUnique({ where: { id: pid }, select: { parent_id: true } });
+      while (cur?.parent_id) {
+        if (cur.parent_id === id) throw new AppError("하위 게임사를 상위로 지정할 수 없습니다.", 400, "CYCLE");
+        cur = await prisma.gameCompany.findUnique({ where: { id: cur.parent_id }, select: { parent_id: true } });
+      }
+    }
+    await prisma.gameCompany.update({ where: { id }, data: { parent_id: pid } });
+    const sibs = await prisma.gameCompany.findMany({
+      where: { parent_id: pid, id: { not: id } },
+      orderBy: [{ sort: "asc" }, { id: "asc" }],
+      select: { id: true },
+    });
+    const orderIds = [];
+    let inserted = false;
+    for (const s of sibs) {
+      if (before_id && s.id === before_id) { orderIds.push(id); inserted = true; }
+      orderIds.push(s.id);
+    }
+    if (!inserted) orderIds.push(id);
+    await prisma.$transaction(orderIds.map((sid, i) => prisma.gameCompany.update({ where: { id: sid }, data: { sort: i } })));
+    return { ok: true };
+  },
+
   async remove(id) {
     const kids = await prisma.gameCompany.count({ where: { parent_id: id } });
     if (kids > 0) throw new AppError("하위 게임사가 있어 삭제할 수 없습니다.", 400, "HAS_CHILDREN");

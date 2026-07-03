@@ -1,6 +1,6 @@
 import service from "../services/vendor.service.js";
 import { validate } from "../plugins/validator.plugin.js";
-import { idSchema, listSchema, saveSchema } from "../validators/vendor.schema.js";
+import { idSchema, listSchema, saveSchema, reorderSchema } from "../validators/vendor.schema.js";
 
 function ensureAuth(user) {
   if (!user?.id) {
@@ -15,5 +15,6 @@ export default async function vendorRoutes(app) {
   app.post("/options", async () => service.options());
   app.post("/get", async (req) => { const { id } = validate(idSchema, req.body); return service.get(id); });
   app.post("/save", async (req) => { ensureAuth(req.user); return service.save(validate(saveSchema, req.body)); });
+  app.post("/reorder", async (req) => { ensureAuth(req.user); return service.reorder(validate(reorderSchema, req.body)); });
   app.post("/delete", async (req) => { ensureAuth(req.user); const { id } = validate(idSchema, req.body); return service.remove(id); });
 }

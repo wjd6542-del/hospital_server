@@ -21,3 +21,9 @@ export const saveSchema = z.object({
   sort: z.coerce.number().int().default(0),
   parent_id: z.coerce.number().int().positive().nullable().optional(),
 });
+
+export const reorderSchema = z.object({
+  id: z.coerce.number().int().positive(),
+  parent_id: z.coerce.number().int().positive().nullable().optional(),
+  before_id: z.coerce.number().int().positive().nullable().optional(),
+});

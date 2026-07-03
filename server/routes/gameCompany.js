@@ -1,6 +1,6 @@
 import service from "../services/gameCompany.service.js";
 import { validate } from "../plugins/validator.plugin.js";
-import { idSchema, listSchema, saveSchema } from "../validators/gameCompany.schema.js";
+import { idSchema, listSchema, saveSchema, reorderSchema } from "../validators/gameCompany.schema.js";
 
 function ensureAdmin(user) {
   if (!user?.is_super) {
@@ -15,5 +15,6 @@ export default async function gameCompanyRoutes(app) {
   app.post("/options", async () => service.options());
   app.post("/get", async (req) => { const { id } = validate(idSchema, req.body); return service.get(id); });
   app.post("/save", async (req) => { ensureAdmin(req.user); return service.save(validate(saveSchema, req.body)); });
+  app.post("/reorder", async (req) => { ensureAdmin(req.user); return service.reorder(validate(reorderSchema, req.body)); });
   app.post("/delete", async (req) => { ensureAdmin(req.user); const { id } = validate(idSchema, req.body); return service.remove(id); });
 }
