@@ -11,6 +11,11 @@ const PERMS = [
   // FAQ
   ["faq.view", "FAQ 조회", "FAQ"],
   ["faq.edit", "FAQ 편집", "FAQ"],
+  // 인사
+  ["department.view", "부서 조회", "인사"],
+  ["department.edit", "부서 편집", "인사"],
+  ["hr.view", "직원 조회", "인사"],
+  ["hr.edit", "직원 편집", "인사"],
   // 환경설정
   ["usermanager.view", "계정 조회", "환경설정"],
   ["usermanager.create", "계정 생성", "환경설정"],
