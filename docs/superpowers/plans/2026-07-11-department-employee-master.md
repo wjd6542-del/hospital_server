@@ -16,6 +16,21 @@
 - **테스트 프레임워크가 없다.** `test/`는 비어 있고 `npm test`는 아무것도 실행하지 않는다. 테스트를 새로 만들지 마세요. 검증은 `npx prisma validate` · `npm run build`(vue-tsc) · `grep` · 수동 클릭이다.
 - **`ag-grid`를 쓰지 않는다.** `package.json`에 있으나 코드베이스 미사용. 기존 화면은 순수 `<table>` + `.tbl`/`.th`/`.td` 클래스. 표본: `src/pages/settings/UserAdmin.vue`
 - 새 권한 4개: `department.view`, `department.edit`, `hr.view`, `hr.edit` (기존 11 → 15)
+- **권한을 라우트에서 강제한다.** `server/middleware/permission.js`의 `permission(code)` preHandler를 쓴다. 코어의 `user.js` · `role.js` · `settings.js` · `permission.js` · `auditLog.js` · `notification.js`가 이미 쓰는 패턴이다. `ensureAuth`(로그인 확인)만으로는 부족하다 — 그러면 로그인한 아무나 인사 데이터를 고칠 수 있고 권한 4개가 장식이 된다.
+
+```javascript
+import { permission } from "../middleware/permission.js";
+
+app.post("/list", { preHandler: permission("department.view") }, async (req) => ...);
+app.post("/save", { preHandler: permission("department.edit") }, async (req) => ...);
+```
+
+  `permission()`은 JWT의 `is_super`면 무조건 통과시키고, 아니면 `decoded.permissions`에 코드가 있는지 본다. `req.user`도 세팅하므로 `ensureAuth`를 따로 부를 필요가 없다.
+
+  라우트별 권한 매핑:
+  - `department`: 조회(`list`/`tree`/`options`/`get`) → `department.view`, 변경(`save`/`reorder`/`delete`) → `department.edit`
+  - `employee`: 조회(`list`/`options`/`get`) → `hr.view`, 변경(`save`/`resign`/`delete`) → `hr.edit`
+  - `category`: 조회(`list`) → `permission.menu.view`, 변경(`save`/`delete`) → `permission.menu.update`
 - Category 코드 그룹: `department_type`, `position`, `job_type`, `employment_type`, `license_type`
 - 커밋 메시지는 한국어. 본문 끝에 `Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>`
 - macOS zsh 주의: `grep`은 **ugrep**이라 GNU식 `--include="*.vue"`가 파일명으로 해석돼 무시된다. `find`로 파일 목록을 만들 것. 따옴표 없는 변수는 단어 분리되지 않으므로 `while IFS= read -r`을 쓸 것. `timeout` 명령이 없다.
