@@ -79,6 +79,8 @@ model User {
   userIpWhitelists UserIpWhitelist[]
   posts            Post[]
   postComments     PostComment[]
+  employee_id Int?      @unique
+  employee    Employee? @relation("UserEmployee", fields: [employee_id], references: [id])
 }
 
 /// 권한 항목 (기능 단위 접근 제어)
@@ -192,21 +194,28 @@ model Settings {
   @@index([sort])
 }
 
-/// 공통 카테고리 (드롭다운 등 공통 코드 관리)
+/// 공통 코드 (직급·직종·고용형태·면허종류·부서유형 등)
 model Category {
   id Int @id @default(autoincrement())
 
+  group String @db.VarChar(50)  // 코드 그룹 (department_type, position, job_type, employment_type, license_type)
   text  String @db.VarChar(255) // 표시명
   value String @db.VarChar(255) // 코드값
 
   is_active Boolean @default(true)
-
-  sort Int @default(0)
+  sort      Int     @default(0)
 
   created_at DateTime? @default(now())
   updated_at DateTime? @updatedAt
 
-  @@index([sort])
+  departmentTypes     Department[]      @relation("DepartmentType")
+  employeePositions   Employee[]        @relation("EmployeePosition")
+  employeeJobTypes    Employee[]        @relation("EmployeeJobType")
+  employeeEmployTypes Employee[]        @relation("EmployeeEmploymentType")
+  licenses            EmployeeLicense[] @relation("LicenseType")
+
+  @@unique([group, value])
+  @@index([group, sort])
 }
 
 /// 자주 하는 질문 (FAQ)
@@ -356,4 +365,90 @@ model LangPack {
   updated_at DateTime @updatedAt
 
   @@index([is_active])
+}
+
+//////////////////////////////////////////////////////////////
+// 인사 마스터 (부서 · 직원)
+//////////////////////////////////////////////////////////////
+
+/// 부서 (계층 트리)
+model Department {
+  id   Int    @id @default(autoincrement())
+  name String @db.VarChar(100)
+  code String @unique @db.VarChar(30) // 부서 코드 (예: DEPT-CARD)
+
+  parent_id Int?
+  parent    Department?  @relation("DepartmentTree", fields: [parent_id], references: [id])
+  children  Department[] @relation("DepartmentTree")
+
+  type_id Int? // 부서 유형 (Category: department_type)
+  type    Category? @relation("DepartmentType", fields: [type_id], references: [id])
+
+  // 부서장 — Employee.department_id 와 순환. 둘 다 nullable 로 둬서 풀린다.
+  head_employee_id Int?
+  head_employee    Employee? @relation("DepartmentHead", fields: [head_employee_id], references: [id])
+
+  employees Employee[] @relation("EmployeeDepartment")
+
+  sort       Int      @default(0)
+  is_active  Boolean  @default(true)
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  @@index([parent_id])
+  @@index([sort])
+}
+
+/// 직원 마스터 — 로그인 계정(User)과 분리, 선택적 1:1 연결
+model Employee {
+  id      Int     @id @default(autoincrement())
+  emp_no  String  @unique @db.VarChar(30) // 사번
+  name    String  @db.VarChar(100)
+  name_en String? @db.VarChar(100)
+
+  department_id Int?
+  department    Department? @relation("EmployeeDepartment", fields: [department_id], references: [id])
+
+  position_id        Int?      // 직급 (Category: position)
+  position           Category? @relation("EmployeePosition", fields: [position_id], references: [id])
+  job_type_id        Int?      // 직종 (Category: job_type)
+  job_type           Category? @relation("EmployeeJobType", fields: [job_type_id], references: [id])
+  employment_type_id Int?      // 고용형태 (Category: employment_type)
+  employment_type    Category? @relation("EmployeeEmploymentType", fields: [employment_type_id], references: [id])
+
+  phone String? @db.VarChar(30)
+  email String? @db.VarChar(200)
+
+  hired_at    DateTime  @db.Date
+  resigned_at DateTime? @db.Date // 있으면 퇴사자
+
+  licenses    EmployeeLicense[]
+  headOfDepts Department[]      @relation("DepartmentHead")
+  user        User?             @relation("UserEmployee")
+
+  is_active  Boolean  @default(true)
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  @@index([department_id])
+  @@index([name])
+}
+
+/// 직원 면허 (1직원 : N면허)
+model EmployeeLicense {
+  id          Int      @id @default(autoincrement())
+  employee_id Int
+  employee    Employee @relation(fields: [employee_id], references: [id], onDelete: Cascade)
+
+  license_type_id Int      // 면허 종류 (Category: license_type)
+  license_type    Category @relation("LicenseType", fields: [license_type_id], references: [id])
+
+  license_no String    @db.VarChar(60)
+  issued_at  DateTime? @db.Date
+  expires_at DateTime? @db.Date
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  @@index([employee_id])
 }
