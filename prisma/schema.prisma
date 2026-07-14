@@ -79,6 +79,8 @@ model User {
   userIpWhitelists UserIpWhitelist[]
   posts            Post[]
   postComments     PostComment[]
+  employee_id Int?      @unique
+  employee    Employee? @relation("UserEmployee", fields: [employee_id], references: [id])
 }
 
 /// 권한 항목 (기능 단위 접근 제어)
@@ -192,245 +194,28 @@ model Settings {
   @@index([sort])
 }
 
-/// 공통 카테고리 (드롭다운 등 공통 코드 관리)
+/// 공통 코드 (직급·직종·고용형태·면허종류·부서유형 등)
 model Category {
   id Int @id @default(autoincrement())
 
+  group String @db.VarChar(50)  // 코드 그룹 (department_type, position, job_type, employment_type, license_type)
   text  String @db.VarChar(255) // 표시명
   value String @db.VarChar(255) // 코드값
 
   is_active Boolean @default(true)
-
-  sort Int @default(0)
+  sort      Int     @default(0)
 
   created_at DateTime? @default(now())
   updated_at DateTime? @updatedAt
 
-  @@index([sort])
-}
+  departmentTypes     Department[]      @relation("DepartmentType")
+  employeePositions   Employee[]        @relation("EmployeePosition")
+  employeeJobTypes    Employee[]        @relation("EmployeeJobType")
+  employeeEmployTypes Employee[]        @relation("EmployeeEmploymentType")
+  licenses            EmployeeLicense[] @relation("LicenseType")
 
-//////////////////////////////////////////////////////////////
-// CS ERP 도메인 (중간 판매자: 게임사에 사용료 지급, 업체에서 사용대금 회수)
-//////////////////////////////////////////////////////////////
-
-/// 지급/회수 구분: PAYMENT=지급(게임사向), COLLECTION=회수(업체発)
-enum LedgerType {
-  PAYMENT
-  COLLECTION
-}
-
-/// 정산 구분: VENDOR=업체 정산(회수), GAME_COMPANY=게임사 정산(지급)
-enum SettlementType {
-  VENDOR
-  GAME_COMPANY
-}
-
-/// 정산 상태
-enum SettlementStatus {
-  PENDING // 대기
-  PARTIAL // 부분정산
-  DONE // 완료
-}
-
-/// 응대 상태
-enum TicketStatus {
-  OPEN // 접수
-  IN_PROGRESS // 처리중
-  RESOLVED // 해결
-  CLOSED // 종료
-}
-
-/// 게임사 (사용료를 지급하는 대상)
-model GameCompany {
-  id            Int     @id @default(autoincrement())
-  name          String // 게임사명
-  code          String? @unique // 식별 코드
-  contact_name  String? // 담당자
-  contact_phone String?
-  contact_email String?
-  fee_rate      Decimal? @db.Decimal(7, 4) // 사용료율(%) 참고값
-  memo          String? @db.Text
-  is_active     Boolean @default(true)
-  sort          Int     @default(0)
-
-  parent_id Int? // 상위 게임사 — null 이면 최상위
-  parent    GameCompany?  @relation("GameCompanyTree", fields: [parent_id], references: [id])
-  children  GameCompany[] @relation("GameCompanyTree")
-
-  created_at DateTime @default(now())
-  updated_at DateTime @updatedAt
-
-  ledgerEntries LedgerEntry[]
-  settlements   Settlement[]
-
-  @@index([sort])
-  @@index([parent_id])
-}
-
-/// 업체 (사용대금을 회수하는 대상) — 상하위(총판-대리점) 계층
-model Vendor {
-  id            Int     @id @default(autoincrement())
-  name          String // 업체명
-  code          String? @unique // 식별 코드 (자동 생성 V0001…)
-  contact_name  String? // 담당자
-  contact_phone String?
-  contact_email String?
-  memo          String? @db.Text
-  is_active     Boolean @default(true)
-  sort          Int     @default(0)
-
-  parent_id Int? // 상위 업체(총판) — null 이면 최상위
-  parent    Vendor?  @relation("VendorTree", fields: [parent_id], references: [id])
-  children  Vendor[] @relation("VendorTree")
-
-  created_at DateTime @default(now())
-  updated_at DateTime @updatedAt
-
-  ledgerEntries LedgerEntry[]
-  settlements   Settlement[]
-
-  @@index([sort])
-  @@index([parent_id])
-}
-
-/// CS 응대 유형 (데스크) — 게시판처럼 동적 추가. 예: 업체 응대 / 게임사 응대 / 솔루션 응대
-model SupportDesk {
-  id         Int      @id @default(autoincrement())
-  name       String // 유형명 (예: 업체 응대)
-  code       String   @unique // 식별 슬러그 (예: vendor)
-  icon       String? // FontAwesome 클래스 (예: fa-store)
-  sort       Int      @default(0)
-  is_active  Boolean  @default(true)
-  created_at DateTime @default(now())
-  updated_at DateTime @updatedAt
-
-  targets SupportTarget[]
-  tickets SupportTicket[]
-
-  @@index([sort])
-}
-
-/// CS 응대 대상 — 유형(desk)별 자체 대상 트리 (범용)
-model SupportTarget {
-  id        Int     @id @default(autoincrement())
-  desk_id   Int
-  desk      SupportDesk @relation(fields: [desk_id], references: [id], onDelete: Cascade)
-  name      String
-  code      String?
-  memo      String? @db.Text
-  is_active Boolean @default(true)
-  sort      Int     @default(0)
-
-  parent_id Int?
-  parent    SupportTarget?  @relation("SupportTargetTree", fields: [parent_id], references: [id])
-  children  SupportTarget[] @relation("SupportTargetTree")
-
-  created_at DateTime @default(now())
-  updated_at DateTime @updatedAt
-
-  tickets SupportTicket[]
-
-  @@index([desk_id])
-  @@index([sort])
-  @@index([parent_id])
-}
-
-/// 장부 원장 (지급/회수 거래 기록)
-model LedgerEntry {
-  id         Int        @id @default(autoincrement())
-  type       LedgerType // PAYMENT(지급) / COLLECTION(회수)
-  entry_date DateTime // 거래 일자
-  amount     Decimal    @db.Decimal(15, 2)
-
-  game_company_id Int?
-  game_company    GameCompany? @relation(fields: [game_company_id], references: [id])
-  vendor_id       Int?
-  vendor          Vendor?      @relation(fields: [vendor_id], references: [id])
-
-  settlement_id Int? // 정산에서 파생된 경우 연결
-  settlement    Settlement? @relation(fields: [settlement_id], references: [id])
-
-  memo       String? @db.Text
-  created_by Int? // User.id (관계 미강제)
-  created_at DateTime @default(now())
-
-  @@index([type])
-  @@index([entry_date])
-  @@index([game_company_id])
-  @@index([vendor_id])
-  @@index([settlement_id])
-}
-
-/// 정산 (기간별 업체 회수 / 게임사 지급 집계)
-model Settlement {
-  id   Int            @id @default(autoincrement())
-  type SettlementType // VENDOR(업체 회수) / GAME_COMPANY(게임사 지급)
-
-  vendor_id       Int?
-  vendor          Vendor?      @relation(fields: [vendor_id], references: [id])
-  game_company_id Int?
-  game_company    GameCompany? @relation(fields: [game_company_id], references: [id])
-
-  period_start DateTime
-  period_end   DateTime
-
-  amount         Decimal          @db.Decimal(15, 2) // 정산 대상 금액
-  settled_amount Decimal          @default(0) @db.Decimal(15, 2) // 처리된 금액
-  status         SettlementStatus @default(PENDING)
-
-  memo       String? @db.Text
-  created_by Int?
-  created_at DateTime @default(now())
-  updated_at DateTime @updatedAt
-
-  ledgerEntries LedgerEntry[]
-
-  @@index([type])
-  @@index([status])
-  @@index([vendor_id])
-  @@index([game_company_id])
-}
-
-/// CS 응대 티켓 — 유형(desk) + 대상(target)
-model SupportTicket {
-  id      Int         @id @default(autoincrement())
-  desk_id Int
-  desk    SupportDesk @relation(fields: [desk_id], references: [id])
-
-  target_id Int?
-  target    SupportTarget? @relation(fields: [target_id], references: [id])
-
-  title    String
-  category String?
-  status   TicketStatus @default(OPEN)
-  priority Int          @default(0) // 0=보통,1=높음,2=긴급
-
-  assignee_id Int? // 담당 User.id
-  created_by  Int?
-
-  created_at DateTime @default(now())
-  updated_at DateTime @updatedAt
-
-  messages SupportMessage[]
-  tags     Tag[]
-
-  @@index([desk_id])
-  @@index([target_id])
-  @@index([status])
-}
-
-/// 응대 메시지 (티켓 내 대화 스레드)
-model SupportMessage {
-  id        Int           @id @default(autoincrement())
-  ticket_id Int
-  ticket    SupportTicket @relation(fields: [ticket_id], references: [id], onDelete: Cascade)
-
-  user_id    Int? // 작성 User.id
-  content    String   @db.Text
-  is_internal Boolean @default(false) // 내부 메모 여부
-  created_at DateTime @default(now())
-
-  @@index([ticket_id])
+  @@unique([group, value])
+  @@index([group, sort])
 }
 
 /// 자주 하는 질문 (FAQ)
@@ -466,18 +251,17 @@ model FaqCategory {
   @@index([sort])
 }
 
-/// 태그 (CS 관리 공통 — 응대/FAQ 다중 태그, 환경설정에서 관리)
+/// 태그 (FAQ 다중 태그, 환경설정에서 관리)
 model Tag {
   id         Int      @id @default(autoincrement())
   name       String   @unique // 태그명
-  color      String   @default("#7a5cff") // 칩 색상(hex)
+  color      String   @default("#64748b") // 칩 색상(hex)
   sort       Int      @default(0)
   is_active  Boolean  @default(true)
   created_at DateTime @default(now())
   updated_at DateTime @updatedAt
 
-  tickets SupportTicket[]
-  faqs    Faq[]
+  faqs Faq[]
 
   @@index([sort])
 }
@@ -572,45 +356,6 @@ model PostAttachment {
   @@index([post_id])
 }
 
-//////////////////////////////////////////////////////////////
-// 환율 (매일 자동 수집)
-//////////////////////////////////////////////////////////////
-
-/// 일별 환율 스냅샷 (1 외화 = X원 기준)
-model ExchangeRate {
-  id     Int      @id @default(autoincrement())
-  base   String   @default("KRW") // 기준 통화
-  date   DateTime // 수집 일자(자정 기준)
-
-  krw Decimal  @default(1) @db.Decimal(18, 4) // 원 (기준=1)
-  usd Decimal? @db.Decimal(18, 4) // 달러
-  jpy Decimal? @db.Decimal(18, 4) // 엔
-  cny Decimal? @db.Decimal(18, 4) // 위안
-  vnd Decimal? @db.Decimal(18, 6) // 베트남 동
-  eur Decimal? @db.Decimal(18, 4) // 유로
-  gbp Decimal? @db.Decimal(18, 4) // 파운드
-  twd Decimal? @db.Decimal(18, 4) // 대만 달러
-  php Decimal? @db.Decimal(18, 4) // 필리핀 페소
-
-  // 코인 (1 코인 = X원)
-  btc  Decimal? @db.Decimal(18, 4) // 비트코인
-  eth  Decimal? @db.Decimal(18, 4) // 이더리움
-  usdt Decimal? @db.Decimal(18, 4) // 테더
-  bnb  Decimal? @db.Decimal(18, 4) // 바이낸스 코인
-  xrp  Decimal? @db.Decimal(18, 4) // 리플
-  sol  Decimal? @db.Decimal(18, 4) // 솔라나
-  usdc Decimal? @db.Decimal(18, 4) // USD Coin
-  doge Decimal? @db.Decimal(18, 4) // 도지코인
-  ada  Decimal? @db.Decimal(18, 4) // 카르다노(에이다)
-  trx  Decimal? @db.Decimal(18, 4) // 트론
-
-  source     String? // 데이터 출처
-  created_at DateTime @default(now())
-
-  @@unique([date])
-  @@index([date])
-}
-
 /// 다국어 번역팩 — name = { ko, en, ja, zh }. 한국어 텍스트를 키로 사용
 model LangPack {
   id         Int      @id @default(autoincrement())
@@ -620,4 +365,90 @@ model LangPack {
   updated_at DateTime @updatedAt
 
   @@index([is_active])
+}
+
+//////////////////////////////////////////////////////////////
+// 인사 마스터 (부서 · 직원)
+//////////////////////////////////////////////////////////////
+
+/// 부서 (계층 트리)
+model Department {
+  id   Int    @id @default(autoincrement())
+  name String @db.VarChar(100)
+  code String @unique @db.VarChar(30) // 부서 코드 (예: DEPT-CARD)
+
+  parent_id Int?
+  parent    Department?  @relation("DepartmentTree", fields: [parent_id], references: [id])
+  children  Department[] @relation("DepartmentTree")
+
+  type_id Int? // 부서 유형 (Category: department_type)
+  type    Category? @relation("DepartmentType", fields: [type_id], references: [id])
+
+  // 부서장 — Employee.department_id 와 순환. 둘 다 nullable 로 둬서 풀린다.
+  head_employee_id Int?
+  head_employee    Employee? @relation("DepartmentHead", fields: [head_employee_id], references: [id])
+
+  employees Employee[] @relation("EmployeeDepartment")
+
+  sort       Int      @default(0)
+  is_active  Boolean  @default(true)
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  @@index([parent_id])
+  @@index([sort])
+}
+
+/// 직원 마스터 — 로그인 계정(User)과 분리, 선택적 1:1 연결
+model Employee {
+  id      Int     @id @default(autoincrement())
+  emp_no  String  @unique @db.VarChar(30) // 사번
+  name    String  @db.VarChar(100)
+  name_en String? @db.VarChar(100)
+
+  department_id Int?
+  department    Department? @relation("EmployeeDepartment", fields: [department_id], references: [id])
+
+  position_id        Int?      // 직급 (Category: position)
+  position           Category? @relation("EmployeePosition", fields: [position_id], references: [id])
+  job_type_id        Int?      // 직종 (Category: job_type)
+  job_type           Category? @relation("EmployeeJobType", fields: [job_type_id], references: [id])
+  employment_type_id Int?      // 고용형태 (Category: employment_type)
+  employment_type    Category? @relation("EmployeeEmploymentType", fields: [employment_type_id], references: [id])
+
+  phone String? @db.VarChar(30)
+  email String? @db.VarChar(200)
+
+  hired_at    DateTime  @db.Date
+  resigned_at DateTime? @db.Date // 있으면 퇴사자
+
+  licenses    EmployeeLicense[]
+  headOfDepts Department[]      @relation("DepartmentHead")
+  user        User?             @relation("UserEmployee")
+
+  is_active  Boolean  @default(true)
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  @@index([department_id])
+  @@index([name])
+}
+
+/// 직원 면허 (1직원 : N면허)
+model EmployeeLicense {
+  id          Int      @id @default(autoincrement())
+  employee_id Int
+  employee    Employee @relation(fields: [employee_id], references: [id], onDelete: Cascade)
+
+  license_type_id Int      // 면허 종류 (Category: license_type)
+  license_type    Category @relation("LicenseType", fields: [license_type_id], references: [id])
+
+  license_no String    @db.VarChar(60)
+  issued_at  DateTime? @db.Date
+  expires_at DateTime? @db.Date
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  @@index([employee_id])
 }

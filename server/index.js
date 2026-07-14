@@ -8,7 +8,7 @@ import { fileURLToPath } from "url";
 import jwt from "jsonwebtoken";
 
 import prisma from "./lib/prisma.js";
-import errorHandlerPlugin from "./plugins/errorHandler.plugin.js";
+import errorHandler from "./errors/errorHandler.js";
 import auditHook from "./plugins/auditHook.js";
 
 const app = Fastify({ logger: true });
@@ -24,7 +24,10 @@ function getClientIp(req) {
 }
 
 await app.register(cors, { origin: true, credentials: true });
-await app.register(errorHandlerPlugin);
+// setErrorHandler 는 반드시 루트 app 인스턴스에서 직접 호출해야 한다 — 캡슐화된 플러그인 안에서
+// 호출하면 그 플러그인의 하위 컨텍스트에만 적용되고, app.register(routeModule...) 로 등록되는
+// 형제 라우트에는 전파되지 않아 Prisma 에러 매핑이 무시된 채 Fastify 기본 500 응답이 나간다.
+app.setErrorHandler(errorHandler);
 await app.register(multipart, {
   limits: { fileSize: 20 * 1024 * 1024, files: 10 },
 });
@@ -88,10 +91,5 @@ if (fs.existsSync(routesPath)) {
   }
 }
 
-import { startExchangeRateCron } from "./cron/exchangeRate.cron.js";
-
 await app.ready();
 app.listen({ port: Number(process.env.PORT) || 3003, host: "0.0.0.0" });
-
-// 환율 일일 자동 수집 크론
-startExchangeRateCron();

@@ -1,5 +1,5 @@
 {
-  "name": "cs-server",
+  "name": "hospital-server",
   "private": true,
   "type": "module",
   "scripts": {
@@ -9,6 +9,7 @@
     "seed": "node prisma/seed.js",
     "seed:board": "node prisma/seed-board.js",
     "seed:rbac": "node prisma/seed-rbac.js",
+    "seed:hr": "node prisma/seed-hr.js",
     "test": "node --test test/"
   },
   "dependencies": {

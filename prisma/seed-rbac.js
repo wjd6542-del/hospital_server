@@ -3,25 +3,26 @@ import { PrismaClient } from "@prisma/client";
 const prisma = new PrismaClient();
 
 // [code, name, group] — group 은 UI 권한 편집 화면의 묶음
+// 병원 도메인 권한(hr.*, inventory.* 등)은 각 도메인 사이클에서 추가한다.
 const PERMS = [
   // 게시판
   ["board.view", "게시판 조회", "게시판"],
   ["board.write", "게시판 작성", "게시판"],
-  // 지급/회수
-  ["ledger.view", "장부 조회", "지급/회수"],
-  ["ledger.edit", "장부 편집", "지급/회수"],
-  ["settlement.view", "정산 조회", "지급/회수"],
-  ["settlement.edit", "정산 처리", "지급/회수"],
-  // CS 관리
-  ["support.view", "응대 조회", "CS 관리"],
-  ["support.edit", "응대 처리", "CS 관리"],
-  ["faq.view", "FAQ 조회", "CS 관리"],
-  ["faq.edit", "FAQ 편집", "CS 관리"],
+  // FAQ
+  ["faq.view", "FAQ 조회", "FAQ"],
+  ["faq.edit", "FAQ 편집", "FAQ"],
+  // 인사
+  ["department.view", "부서 조회", "인사"],
+  ["department.edit", "부서 편집", "인사"],
+  ["hr.view", "직원 조회", "인사"],
+  ["hr.edit", "직원 편집", "인사"],
+  // 감사로그
+  ["logs.view", "감사로그 조회", "감사로그"],
+  // 알림
+  ["notification.view", "알림 조회", "알림"],
+  ["notification.read", "알림 읽음 처리", "알림"],
+  ["notification.delete", "알림 삭제", "알림"],
   // 환경설정
-  ["gameCompany.view", "게임사 조회", "환경설정"],
-  ["gameCompany.edit", "게임사 편집", "환경설정"],
-  ["vendor.view", "업체 조회", "환경설정"],
-  ["vendor.edit", "업체 편집", "환경설정"],
   ["usermanager.view", "계정 조회", "환경설정"],
   ["usermanager.create", "계정 생성", "환경설정"],
   ["usermanager.update", "계정 수정", "환경설정"],
@@ -29,6 +30,8 @@ const PERMS = [
   ["permission.user.update", "역할 수정", "환경설정"],
   ["permission.menu.view", "권한 조회", "환경설정"],
   ["permission.menu.update", "권한 수정", "환경설정"],
+  ["setting.view", "설정 조회", "환경설정"],
+  ["setting.update", "설정 수정", "환경설정"],
 ];
 
 async function main() {
@@ -44,35 +47,31 @@ async function main() {
     sort++;
   }
 
-  const manager = await prisma.role.upsert({
-    where: { name: "정산담당" },
-    update: {},
-    create: { name: "정산담당", description: "지급/회수·정산 관리", sort: 1 },
-  });
-  const cs = await prisma.role.upsert({
-    where: { name: "CS담당" },
-    update: {},
-    create: { name: "CS담당", description: "CS 응대·FAQ", sort: 2 },
+  // RolePermission.permission 에 onDelete: Cascade가 없으므로, 카탈로그 밖
+  // 권한을 참조하는 RolePermission 행을 먼저 지워야 FK 제약을 피할 수 있다.
+  await prisma.rolePermission.deleteMany({
+    where: { permission: { code: { notIn: PERMS.map(([code]) => code) } } },
   });
 
-  async function assign(roleId, codes) {
-    await prisma.rolePermission.deleteMany({ where: { role_id: roleId } });
-    await prisma.rolePermission.createMany({
-      data: codes.map((c) => ({ role_id: roleId, permission_id: idByCode[c] })),
-    });
-  }
-  await assign(manager.id, [
-    "board.view", "board.write",
-    "ledger.view", "ledger.edit", "settlement.view", "settlement.edit",
-    "gameCompany.view", "vendor.view", "vendor.edit",
-  ]);
-  await assign(cs.id, [
-    "board.view", "board.write",
-    "support.view", "support.edit", "faq.view", "faq.edit",
-    "vendor.view", "gameCompany.view",
-  ]);
+  // 카탈로그에서 빠진 권한 행 정리 (CS 도메인 잔재)
+  const removed = await prisma.permission.deleteMany({
+    where: { code: { notIn: PERMS.map(([code]) => code) } },
+  });
 
-  console.log(`✅ rbac seed done: ${Object.keys(idByCode).length} perms, roles 정산담당/CS담당`);
+  const admin = await prisma.role.upsert({
+    where: { name: "관리자" },
+    update: {},
+    create: { name: "관리자", description: "전체 권한", sort: 1 },
+  });
+
+  await prisma.rolePermission.deleteMany({ where: { role_id: admin.id } });
+  await prisma.rolePermission.createMany({
+    data: PERMS.map(([code]) => ({ role_id: admin.id, permission_id: idByCode[code] })),
+  });
+
+  console.log(
+    `✅ rbac seed done: ${PERMS.length} perms (removed ${removed.count} stale), role 관리자`,
+  );
 }
 
 main()
