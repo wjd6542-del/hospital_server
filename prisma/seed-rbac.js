@@ -16,6 +16,12 @@ const PERMS = [
   ["department.edit", "부서 편집", "인사"],
   ["hr.view", "직원 조회", "인사"],
   ["hr.edit", "직원 편집", "인사"],
+  // 감사로그
+  ["logs.view", "감사로그 조회", "감사로그"],
+  // 알림
+  ["notification.view", "알림 조회", "알림"],
+  ["notification.read", "알림 읽음 처리", "알림"],
+  ["notification.delete", "알림 삭제", "알림"],
   // 환경설정
   ["usermanager.view", "계정 조회", "환경설정"],
   ["usermanager.create", "계정 생성", "환경설정"],
@@ -24,6 +30,8 @@ const PERMS = [
   ["permission.user.update", "역할 수정", "환경설정"],
   ["permission.menu.view", "권한 조회", "환경설정"],
   ["permission.menu.update", "권한 수정", "환경설정"],
+  ["setting.view", "설정 조회", "환경설정"],
+  ["setting.update", "설정 수정", "환경설정"],
 ];
 
 async function main() {

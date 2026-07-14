@@ -51,7 +51,10 @@ export default {
     return e;
   },
 
-  /** 신규/수정 겸용. 면허는 통째로 갈아끼운다(deleteMany → createMany). */
+  /**
+   * 신규/수정 겸용. licenses 가 undefined 면(클라이언트가 안 보낸 것) 면허 목록을 건드리지 않는다.
+   * licenses 가 명시적으로 배열(빈 배열 포함)로 오면 통째로 갈아끼운다(deleteMany → createMany).
+   */
   async save(data) {
     const { id, licenses, ...fields } = data;
     if (fields.email === "") fields.email = null;
@@ -67,7 +70,9 @@ export default {
         const ex = await tx.employee.findUnique({ where: { id } });
         if (!ex) throw new AppError("직원을 찾을 수 없습니다.", 404, "NOT_FOUND");
         emp = await tx.employee.update({ where: { id }, data: fields });
-        await tx.employeeLicense.deleteMany({ where: { employee_id: id } });
+        if (licenses !== undefined) {
+          await tx.employeeLicense.deleteMany({ where: { employee_id: id } });
+        }
       } else {
         emp = await tx.employee.create({ data: fields });
       }

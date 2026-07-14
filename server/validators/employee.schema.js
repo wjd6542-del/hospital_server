@@ -30,8 +30,11 @@ export const saveSchema = z.object({
   phone: z.string().trim().nullish(),
   email: z.string().trim().email("이메일 형식이 아닙니다").nullish().or(z.literal("")),
   hired_at: z.coerce.date({ message: "입사일을 입력하세요" }),
-  is_active: z.boolean().default(true),
-  licenses: z.array(licenseSchema).default([]),
+  // .default() 대신 .optional() — 클라이언트가 안 보내면 undefined 로 남겨 update 시 기존 값을 보존한다.
+  // (신규 생성 시엔 Prisma 스키마의 @default 가 채운다. licenses 는 undefined 면 service.save() 가
+  // deleteMany/createMany 를 건너뛰고, 명시적으로 [] 를 보낸 경우에만 면허를 전부 지운다.)
+  is_active: z.boolean().optional(),
+  licenses: z.array(licenseSchema).optional(),
 });
 
 export const resignSchema = z.object({
