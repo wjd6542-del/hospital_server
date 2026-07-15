@@ -10,6 +10,7 @@
     "seed:board": "node prisma/seed-board.js",
     "seed:rbac": "node prisma/seed-rbac.js",
     "seed:hr": "node prisma/seed-hr.js",
+    "seed:leave": "node prisma/seed-leave.js",
     "test": "node --test test/"
   },
   "dependencies": {

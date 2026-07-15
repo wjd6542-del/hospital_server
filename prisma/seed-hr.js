@@ -54,6 +54,9 @@ const SHIFT_TYPES = [
   ["OFF", "비번", null, null, false, 0, false, "#94a3b8"],
   ["ANNUAL", "연차", null, null, false, 0, false, "#059669"],
   ["SICK", "병가", null, null, false, 0, false, "#dc2626"],
+  ["EVENT", "경조", null, null, false, 0, false, "#7c3aed"],
+  ["OFFICIAL", "공가", null, null, false, 0, false, "#0891b2"],
+  ["UNPAID", "무급", null, null, false, 0, false, "#a16207"],
 ];
 
 async function main() {

@@ -79,8 +79,8 @@ model User {
   userIpWhitelists UserIpWhitelist[]
   posts            Post[]
   postComments     PostComment[]
-  employee_id Int?      @unique
-  employee    Employee? @relation("UserEmployee", fields: [employee_id], references: [id])
+  employee_id      Int?              @unique
+  employee         Employee?         @relation("UserEmployee", fields: [employee_id], references: [id])
 }
 
 /// 권한 항목 (기능 단위 접근 제어)
@@ -198,7 +198,7 @@ model Settings {
 model Category {
   id Int @id @default(autoincrement())
 
-  group String @db.VarChar(50)  // 코드 그룹 (department_type, position, job_type, employment_type, license_type)
+  group String @db.VarChar(50) // 코드 그룹 (department_type, position, job_type, employment_type, license_type)
   text  String @db.VarChar(255) // 표시명
   value String @db.VarChar(255) // 코드값
 
@@ -225,10 +225,10 @@ model Faq {
   question      String // 질문 제목
   question_body String? @db.LongText // 질문 내용(HTML)
   answer        String  @db.LongText
-  sort       Int      @default(0)
-  is_pinned  Boolean  @default(false) // 상단 고정
-  is_active  Boolean  @default(true)
-  view_count Int      @default(0)
+  sort          Int     @default(0)
+  is_pinned     Boolean @default(false) // 상단 고정
+  is_active     Boolean @default(true)
+  view_count    Int     @default(0)
 
   created_at DateTime @default(now())
   updated_at DateTime @updatedAt
@@ -301,15 +301,15 @@ model Board {
 
 /// 게시글
 model Post {
-  id       Int  @id @default(autoincrement())
+  id       Int   @id @default(autoincrement())
   board_id Int
   board    Board @relation(fields: [board_id], references: [id])
 
   user_id Int?
   user    User? @relation(fields: [user_id], references: [id])
 
-  title   String
-  content String  @db.LongText // HTML 본문
+  title      String
+  content    String  @db.LongText // HTML 본문
   is_notice  Boolean @default(false) // 공지 고정
   view_count Int     @default(0)
 
@@ -409,11 +409,11 @@ model Employee {
   department_id Int?
   department    Department? @relation("EmployeeDepartment", fields: [department_id], references: [id])
 
-  position_id        Int?      // 직급 (Category: position)
+  position_id        Int? // 직급 (Category: position)
   position           Category? @relation("EmployeePosition", fields: [position_id], references: [id])
-  job_type_id        Int?      // 직종 (Category: job_type)
+  job_type_id        Int? // 직종 (Category: job_type)
   job_type           Category? @relation("EmployeeJobType", fields: [job_type_id], references: [id])
-  employment_type_id Int?      // 고용형태 (Category: employment_type)
+  employment_type_id Int? // 고용형태 (Category: employment_type)
   employment_type    Category? @relation("EmployeeEmploymentType", fields: [employment_type_id], references: [id])
 
   phone String? @db.VarChar(30)
@@ -422,11 +422,14 @@ model Employee {
   hired_at    DateTime  @db.Date
   resigned_at DateTime? @db.Date // 있으면 퇴사자
 
-  licenses    EmployeeLicense[]
-  schedules   ShiftSchedule[]
-  attendances Attendance[]
-  headOfDepts Department[]      @relation("DepartmentHead")
-  user        User?             @relation("UserEmployee")
+  licenses       EmployeeLicense[]
+  schedules      ShiftSchedule[]
+  attendances    Attendance[]
+  leaveGrants    LeaveGrant[]
+  leaveRequests  LeaveRequest[]
+  approvedLeaves LeaveRequest[]    @relation("LeaveApprover") // 이 직원이 승인/반려한 신청
+  headOfDepts    Department[]      @relation("DepartmentHead")
+  user           User?             @relation("UserEmployee")
 
   is_active  Boolean  @default(true)
   created_at DateTime @default(now())
@@ -442,7 +445,7 @@ model EmployeeLicense {
   employee_id Int
   employee    Employee @relation(fields: [employee_id], references: [id], onDelete: Cascade)
 
-  license_type_id Int      // 면허 종류 (Category: license_type)
+  license_type_id Int // 면허 종류 (Category: license_type)
   license_type    Category @relation("LicenseType", fields: [license_type_id], references: [id])
 
   license_no String    @db.VarChar(60)
@@ -461,18 +464,18 @@ model EmployeeLicense {
 
 /// 근태 상태 — 판정 우선순위: ABSENT > LATE > EARLY_LEAVE > NORMAL
 enum AttendanceStatus {
-  NORMAL      // 정상
-  LATE        // 지각
+  NORMAL // 정상
+  LATE // 지각
   EARLY_LEAVE // 조퇴
-  ABSENT      // 결근
-  LEAVE       // 휴가 (is_work=false 유형)
+  ABSENT // 결근
+  LEAVE // 휴가 (is_work=false 유형)
 }
 
 /// 근무유형 (데이/이브닝/나이트/비번/연차/병가)
 model ShiftType {
   id   Int    @id @default(autoincrement())
   code String @unique @db.VarChar(20) // D, E, N, OFF, ANNUAL, SICK
-  name String @db.VarChar(50)         // 데이, 이브닝, 나이트, 비번, 연차, 병가
+  name String @db.VarChar(50) // 데이, 이브닝, 나이트, 비번, 연차, 병가
 
   // 벽시계 시각을 문자열로 둔다. MySQL TIME 을 Prisma 가 DateTime 으로 매핑해
   // 날짜가 딸려오고 타임존 변환에 휘말리는 것을 피한다. is_work=false 면 null.
@@ -480,13 +483,14 @@ model ShiftType {
   end_time   String? @db.VarChar(5) // "17:00"
 
   crosses_midnight Boolean @default(false) // 나이트처럼 종료가 다음날이면 true
-  break_minutes    Int     @default(0)     // 휴게시간 — 근무시간 계산에서 뺀다
-  is_work          Boolean @default(true)  // 비번·연차·병가는 false
+  break_minutes    Int     @default(0) // 휴게시간 — 근무시간 계산에서 뺀다
+  is_work          Boolean @default(true) // 비번·연차·병가는 false
 
   color String @default("#64748b") @db.VarChar(20) // 그리드 셀 색
 
   schedules   ShiftSchedule[]
   attendances Attendance[] // 판정 기준 스냅샷 역참조
+  leaveTypes  LeaveType[]     @relation("LeaveTypeShift") // 이 근무유형으로 찍히는 휴가유형
 
   sort       Int      @default(0)
   is_active  Boolean  @default(true)
@@ -547,4 +551,90 @@ model Attendance {
   @@unique([employee_id, work_date])
   @@index([work_date])
   @@index([status])
+}
+
+//////////////////////////////////////////////////////////////
+// 휴가 · 연차
+//////////////////////////////////////////////////////////////
+
+/// 휴가 신청 상태
+enum LeaveStatus {
+  PENDING // 대기
+  APPROVED // 승인
+  REJECTED // 반려
+  CANCELED // 취소
+}
+
+/// 휴가유형 마스터 (연차·병가·경조사·공가·무급)
+model LeaveType {
+  id   Int    @id @default(autoincrement())
+  code String @unique @db.VarChar(20) // ANNUAL, SICK, EVENT, OFFICIAL, UNPAID
+  name String @db.VarChar(50)
+
+  is_paid           Boolean @default(true) // 유급 여부
+  deduct_annual     Boolean @default(false) // 연차 잔여에서 차감 (연차만 true)
+  requires_approval Boolean @default(true) // 승인 절차 필요 여부
+
+  // 승인 시 근무표에 찍을 근무유형 (연차→ANNUAL, 병가→SICK 등). null 이면 근무표 미반영.
+  shift_type_id Int?
+  shift_type    ShiftType? @relation("LeaveTypeShift", fields: [shift_type_id], references: [id])
+
+  color String @default("#64748b") @db.VarChar(20)
+
+  requests LeaveRequest[]
+
+  sort       Int      @default(0)
+  is_active  Boolean  @default(true)
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  @@index([sort])
+}
+
+/// 연차 부여 (직원 × 연도) — 잔여 = granted_days − 승인된 차감성 휴가일수
+model LeaveGrant {
+  id          Int      @id @default(autoincrement())
+  employee_id Int
+  employee    Employee @relation(fields: [employee_id], references: [id], onDelete: Cascade)
+
+  year         Int
+  granted_days Float // 부여 연차 (반차 0.5 단위)
+  note         String? @db.VarChar(200)
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  @@unique([employee_id, year])
+  @@index([year])
+}
+
+/// 휴가 신청 / 승인
+model LeaveRequest {
+  id          Int      @id @default(autoincrement())
+  employee_id Int
+  employee    Employee @relation(fields: [employee_id], references: [id], onDelete: Cascade)
+
+  leave_type_id Int
+  leave_type    LeaveType @relation(fields: [leave_type_id], references: [id])
+
+  start_date DateTime @db.Date
+  end_date   DateTime @db.Date
+  days       Float // 신청 일수 (반차 0.5 지원)
+
+  reason String? @db.VarChar(300)
+
+  status LeaveStatus @default(PENDING)
+
+  // 승인/반려 처리 이력
+  approver_id   Int?
+  approver      Employee? @relation("LeaveApprover", fields: [approver_id], references: [id])
+  approved_at   DateTime?
+  reject_reason String?   @db.VarChar(300)
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  @@index([employee_id])
+  @@index([status])
+  @@index([start_date])
 }
