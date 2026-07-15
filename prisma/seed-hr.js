@@ -46,6 +46,16 @@ const DEPARTMENTS = [
   ["DEPT-RECEP", "원무팀", "DEPT-ADM", "ADMIN"],
 ];
 
+// [code, name, start, end, crosses_midnight, break_minutes, is_work, color]
+const SHIFT_TYPES = [
+  ["D", "데이", "07:00", "15:00", false, 30, true, "#2563eb"],
+  ["E", "이브닝", "15:00", "23:00", false, 30, true, "#d97706"],
+  ["N", "나이트", "22:00", "07:00", true, 60, true, "#4338ca"],
+  ["OFF", "비번", null, null, false, 0, false, "#94a3b8"],
+  ["ANNUAL", "연차", null, null, false, 0, false, "#059669"],
+  ["SICK", "병가", null, null, false, 0, false, "#dc2626"],
+];
+
 async function main() {
   // 1) 공통 코드
   const codeId = {}; // `${group}:${value}` -> id
@@ -84,7 +94,20 @@ async function main() {
     dsort++;
   }
 
-  console.log(`✅ hr seed done: ${CODES.length} codes, ${DEPARTMENTS.length} departments`);
+  // 3) 근무유형
+  let ssort = 0;
+  for (const [code, name, start_time, end_time, crosses_midnight, break_minutes, is_work, color] of SHIFT_TYPES) {
+    await prisma.shiftType.upsert({
+      where: { code },
+      update: { name, start_time, end_time, crosses_midnight, break_minutes, is_work, color, sort: ssort },
+      create: { code, name, start_time, end_time, crosses_midnight, break_minutes, is_work, color, sort: ssort },
+    });
+    ssort++;
+  }
+
+  console.log(
+    `✅ hr seed done: ${CODES.length} codes, ${DEPARTMENTS.length} departments, ${SHIFT_TYPES.length} shift types`,
+  );
   console.log("   직원은 시드하지 않습니다 — 화면에서 등록하며 검증하세요.");
 }
 
