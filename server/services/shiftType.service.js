@@ -21,6 +21,15 @@ export default {
     if (fields.start_time !== undefined) fields.start_time = normTime(fields.start_time);
     if (fields.end_time !== undefined) fields.end_time = normTime(fields.end_time);
 
+    // 종료시각이 시작시각보다 이르거나 같으면 자정을 넘긴 근무다("HH:MM" 사전순 = 시각순 비교).
+    // crosses_midnight 를 관리자가 깜빡해도(기본값 false) 판정 계산기가 24시간 유령 연장을
+    // 만들지 않도록 여기서 자동 파생한다. is_work가 false(비번·연차 등)면 시각이 없으니 건너뛴다.
+    if (fields.is_work !== false && fields.start_time && fields.end_time) {
+      if (fields.end_time <= fields.start_time && fields.crosses_midnight !== true) {
+        fields.crosses_midnight = true;
+      }
+    }
+
     const dup = await prisma.shiftType.findFirst({
       where: { code: fields.code, ...(id ? { id: { not: id } } : {}) },
     });
