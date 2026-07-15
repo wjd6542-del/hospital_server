@@ -423,6 +423,8 @@ model Employee {
   resigned_at DateTime? @db.Date // 있으면 퇴사자
 
   licenses    EmployeeLicense[]
+  schedules   ShiftSchedule[]
+  attendances Attendance[]
   headOfDepts Department[]      @relation("DepartmentHead")
   user        User?             @relation("UserEmployee")
 
@@ -451,4 +453,98 @@ model EmployeeLicense {
   updated_at DateTime @updatedAt
 
   @@index([employee_id])
+}
+
+//////////////////////////////////////////////////////////////
+// 근태 · 교대
+//////////////////////////////////////////////////////////////
+
+/// 근태 상태 — 판정 우선순위: ABSENT > LATE > EARLY_LEAVE > NORMAL
+enum AttendanceStatus {
+  NORMAL      // 정상
+  LATE        // 지각
+  EARLY_LEAVE // 조퇴
+  ABSENT      // 결근
+  LEAVE       // 휴가 (is_work=false 유형)
+}
+
+/// 근무유형 (데이/이브닝/나이트/비번/연차/병가)
+model ShiftType {
+  id   Int    @id @default(autoincrement())
+  code String @unique @db.VarChar(20) // D, E, N, OFF, ANNUAL, SICK
+  name String @db.VarChar(50)         // 데이, 이브닝, 나이트, 비번, 연차, 병가
+
+  // 벽시계 시각을 문자열로 둔다. MySQL TIME 을 Prisma 가 DateTime 으로 매핑해
+  // 날짜가 딸려오고 타임존 변환에 휘말리는 것을 피한다. is_work=false 면 null.
+  start_time String? @db.VarChar(5) // "08:00"
+  end_time   String? @db.VarChar(5) // "17:00"
+
+  crosses_midnight Boolean @default(false) // 나이트처럼 종료가 다음날이면 true
+  break_minutes    Int     @default(0)     // 휴게시간 — 근무시간 계산에서 뺀다
+  is_work          Boolean @default(true)  // 비번·연차·병가는 false
+
+  color String @default("#64748b") @db.VarChar(20) // 그리드 셀 색
+
+  schedules   ShiftSchedule[]
+  attendances Attendance[] // 판정 기준 스냅샷 역참조
+
+  sort       Int      @default(0)
+  is_active  Boolean  @default(true)
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  @@index([sort])
+}
+
+/// 근무표 — 직원 × 날짜 = 근무유형
+model ShiftSchedule {
+  id          Int      @id @default(autoincrement())
+  employee_id Int
+  employee    Employee @relation(fields: [employee_id], references: [id], onDelete: Cascade)
+
+  work_date DateTime @db.Date
+
+  shift_type_id Int
+  shift_type    ShiftType @relation(fields: [shift_type_id], references: [id])
+
+  memo String? @db.VarChar(200)
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  @@unique([employee_id, work_date]) // 하루에 근무 하나
+  @@index([work_date])
+}
+
+/// 실제 출퇴근 — work_date 는 시작일 기준(나이트도 마찬가지)
+model Attendance {
+  id          Int      @id @default(autoincrement())
+  employee_id Int
+  employee    Employee @relation(fields: [employee_id], references: [id], onDelete: Cascade)
+
+  work_date DateTime @db.Date // 나이트 근무도 시작일
+
+  check_in  DateTime? // null 이면 결근
+  check_out DateTime? // null 이면 퇴근 미기록
+
+  // 판정 기준 스냅샷 — 근무표가 나중에 바뀌어도 판정 근거는 남아야 한다.
+  // null 이면 근무표에 없는 날 출근한 것.
+  shift_type_id Int?
+  shift_type    ShiftType? @relation(fields: [shift_type_id], references: [id])
+
+  // 계산 결과를 저장한다 — 조회할 때마다 재계산하지 않는다
+  status              AttendanceStatus @default(NORMAL)
+  work_minutes        Int              @default(0) // 실근무 (휴게 제외)
+  overtime_minutes    Int              @default(0)
+  late_minutes        Int              @default(0)
+  early_leave_minutes Int              @default(0)
+
+  memo String? @db.VarChar(200)
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  @@unique([employee_id, work_date])
+  @@index([work_date])
+  @@index([status])
 }
