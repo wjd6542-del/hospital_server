@@ -82,9 +82,12 @@ export default {
     if (id) {
       const ex = await prisma.purchaseOrder.findUnique({ where: { id } });
       if (!ex) throw new AppError("발주를 찾을 수 없습니다.", 404, "NOT_FOUND");
-      await prisma.purchaseOrder.update({ where: { id }, data: payload });
-      await prisma.purchaseOrderItem.deleteMany({ where: { order_id: id } });
-      await prisma.purchaseOrderItem.createMany({ data: itemData.map((it) => ({ ...it, order_id: id })) });
+      // 헤더 갱신 + 품목 교체를 원자적으로 (부분 실패 시 품목 유실 방지)
+      await prisma.$transaction([
+        prisma.purchaseOrder.update({ where: { id }, data: payload }),
+        prisma.purchaseOrderItem.deleteMany({ where: { order_id: id } }),
+        prisma.purchaseOrderItem.createMany({ data: itemData.map((it) => ({ ...it, order_id: id })) }),
+      ]);
       orderId = id;
     } else {
       const created = await prisma.purchaseOrder.create({

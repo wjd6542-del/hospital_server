@@ -81,17 +81,16 @@ export default {
     if (id) {
       const ex = await prisma.financeTransaction.findUnique({ where: { id } });
       if (!ex) throw new AppError("거래를 찾을 수 없습니다.", 404, "NOT_FOUND");
-      await prisma.financeTransaction.update({ where: { id }, data: payload });
       txnId = id;
-      // 첨부는 전달된 목록으로 교체 (undefined 면 유지)
+      // 헤더 갱신 + 첨부 교체를 원자적으로 (부분 실패 시 첨부 유실 방지). undefined 면 첨부 유지
+      const ops = [prisma.financeTransaction.update({ where: { id }, data: payload })];
       if (attachments !== undefined) {
-        await prisma.financeAttachment.deleteMany({ where: { transaction_id: id } });
+        ops.push(prisma.financeAttachment.deleteMany({ where: { transaction_id: id } }));
         if (attachments.length) {
-          await prisma.financeAttachment.createMany({
-            data: attachments.map((a) => ({ ...a, transaction_id: id })),
-          });
+          ops.push(prisma.financeAttachment.createMany({ data: attachments.map((a) => ({ ...a, transaction_id: id })) }));
         }
       }
+      await prisma.$transaction(ops);
     } else {
       const created = await prisma.financeTransaction.create({
         data: {
