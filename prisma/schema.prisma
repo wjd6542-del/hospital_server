@@ -391,6 +391,7 @@ model Department {
   employees Employee[] @relation("EmployeeDepartment")
 
   financeTransactions FinanceTransaction[] @relation("FinanceTxnDepartment")
+  purchaseOrders      PurchaseOrder[]      @relation("PODepartment")
 
   sort       Int      @default(0)
   is_active  Boolean  @default(true)
@@ -723,4 +724,66 @@ model FinanceAttachment {
   created_at DateTime @default(now())
 
   @@index([transaction_id])
+}
+
+// ─────────────────────────────────────────────
+// 구매(Purchasing) — 거래처 · 발주
+// ─────────────────────────────────────────────
+
+model Vendor {
+  id Int @id @default(autoincrement())
+
+  name        String  @db.VarChar(120) // 상호
+  business_no String? @db.VarChar(20) // 사업자번호
+  contact     String? @db.VarChar(60) // 담당자
+  phone       String? @db.VarChar(30)
+  email       String? @db.VarChar(120)
+  memo        String? @db.VarChar(255)
+
+  is_active Boolean @default(true)
+  sort      Int     @default(0)
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  orders PurchaseOrder[]
+
+  @@index([sort])
+}
+
+model PurchaseOrder {
+  id Int @id @default(autoincrement())
+
+  vendor_id Int
+  vendor    Vendor @relation(fields: [vendor_id], references: [id])
+
+  order_date DateTime @db.Date
+  status     String   @db.VarChar(12) // DRAFT | ORDERED | RECEIVED | CANCELED
+
+  department_id Int?
+  department    Department? @relation("PODepartment", fields: [department_id], references: [id])
+
+  memo String? @db.VarChar(255)
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  items PurchaseOrderItem[]
+
+  @@index([order_date])
+  @@index([status])
+  @@index([vendor_id])
+}
+
+model PurchaseOrderItem {
+  id       Int           @id @default(autoincrement())
+  order_id Int
+  order    PurchaseOrder @relation(fields: [order_id], references: [id], onDelete: Cascade)
+
+  name       String  @db.VarChar(150) // 품목명(자유 입력)
+  qty        Decimal @db.Decimal(12, 2)
+  unit       String? @db.VarChar(20) // 단위(개/박스 등)
+  unit_price Decimal @db.Decimal(15, 2)
+
+  @@index([order_id])
 }

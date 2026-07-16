@@ -24,6 +24,9 @@ const PERMS = [
   // 재무
   ["finance.view", "재무 조회", "재무"],
   ["finance.edit", "재무 편집", "재무"],
+  // 구매
+  ["purchase.view", "구매 조회", "구매"],
+  ["purchase.edit", "구매 편집", "구매"],
   // 감사로그
   ["logs.view", "감사로그 조회", "감사로그"],
   // 알림
