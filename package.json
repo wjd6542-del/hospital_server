@@ -11,9 +11,11 @@
     "seed:rbac": "node prisma/seed-rbac.js",
     "seed:hr": "node prisma/seed-hr.js",
     "seed:leave": "node prisma/seed-leave.js",
+    "seed:lab": "node prisma/seed-lab.js",
     "verify:leave": "node scripts/verifyLeaveReflect.mjs",
     "verify:emr": "node scripts/verifyEmr.mjs",
     "verify:prescription": "node scripts/verifyPrescription.mjs",
+    "verify:lab": "node scripts/verifyLab.mjs",
     "test": "node --test test/"
   },
   "dependencies": {

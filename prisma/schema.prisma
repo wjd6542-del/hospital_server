@@ -442,6 +442,7 @@ model Employee {
   admissions     Admission[]       @relation("AdmissionDoctor")
   encounters     Encounter[]       @relation("EncounterDoctor")
   prescriptions  Prescription[]    @relation("PrescriptionDoctor")
+  labOrders      LabOrder[]        @relation("LabOrderDoctor")
   headOfDepts    Department[]      @relation("DepartmentHead")
   user           User?             @relation("UserEmployee")
 
@@ -1043,6 +1044,7 @@ model Patient {
 
   encounters    Encounter[]
   prescriptions Prescription[]
+  labOrders     LabOrder[]
 
   @@index([name])
 }
@@ -1089,6 +1091,7 @@ model Encounter {
 
   diagnoses     Diagnosis[]
   prescriptions Prescription[]
+  labOrders     LabOrder[]
 
   @@index([patient_id])
   @@index([encounter_date])
@@ -1174,4 +1177,98 @@ model PrescriptionItem {
 
   @@index([prescription_id])
   @@index([item_id])
+}
+
+//////////////////////////////////////////////////////////////
+// 검사 오더 · 결과
+//////////////////////////////////////////////////////////////
+
+/// 검사 오더 상태
+enum LabOrderStatus {
+  ORDERED // 오더 발행
+  RESULTED // 결과 완료
+  CANCELED // 취소
+}
+
+/// 검사 우선순위
+enum LabPriority {
+  ROUTINE // 일반
+  STAT // 응급
+}
+
+/// 결과 이상 플래그
+enum ResultFlag {
+  NORMAL // 정상
+  HIGH // 높음
+  LOW // 낮음
+  ABNORMAL // 이상(비수치)
+}
+
+/// 검사 마스터 — 오더 가능한 검사 항목
+model LabTest {
+  id       Int     @id @default(autoincrement())
+  code     String  @unique @db.VarChar(30)
+  name     String  @db.VarChar(100)
+  category String? @db.VarChar(30) // 검체/영상/기능
+  specimen String? @db.VarChar(40) // 혈액/소변 등
+  unit     String? @db.VarChar(20)
+  ref_low  Float? // 수치 참고 하한
+  ref_high Float? // 수치 참고 상한
+  ref_text String? @db.VarChar(100) // 비수치 참고치(예: 음성)
+
+  is_active  Boolean  @default(true)
+  sort       Int      @default(0)
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  orderItems LabOrderItem[]
+
+  @@index([sort])
+}
+
+/// 검사 오더 — 진료에서 발행
+model LabOrder {
+  id           Int        @id @default(autoincrement())
+  encounter_id Int?
+  encounter    Encounter? @relation(fields: [encounter_id], references: [id])
+  patient_id   Int
+  patient      Patient    @relation(fields: [patient_id], references: [id], onDelete: Cascade)
+  doctor_id    Int?
+  doctor       Employee?  @relation("LabOrderDoctor", fields: [doctor_id], references: [id])
+
+  ordered_at DateTime       @db.Date
+  priority   LabPriority    @default(ROUTINE)
+  status     LabOrderStatus @default(ORDERED)
+  memo       String?        @db.VarChar(255)
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  items LabOrderItem[]
+
+  @@index([patient_id])
+  @@index([encounter_id])
+  @@index([status])
+  @@index([ordered_at])
+}
+
+/// 검사 항목 + 결과 — 오더 1:N
+model LabOrderItem {
+  id       Int      @id @default(autoincrement())
+  order_id Int
+  order    LabOrder @relation(fields: [order_id], references: [id], onDelete: Cascade)
+
+  // 검사 마스터 연계(선택) — 참고범위 판정에 사용
+  lab_test_id Int?
+  lab_test    LabTest? @relation(fields: [lab_test_id], references: [id])
+
+  test_name    String      @db.VarChar(100)
+  result_value String?     @db.VarChar(100) // 수치/텍스트 결과
+  unit         String?     @db.VarChar(20)
+  ref_range    String?     @db.VarChar(100) // 참고치 스냅샷(표시용)
+  flag         ResultFlag? // 이상 플래그
+  resulted_at  DateTime? // 결과 입력 일시
+
+  @@index([order_id])
+  @@index([lab_test_id])
 }
