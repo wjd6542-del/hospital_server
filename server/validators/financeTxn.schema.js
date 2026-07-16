@@ -36,6 +36,11 @@ export const dashboardSchema = z.object({
   department_id: z.coerce.number().int().positive().nullish(),
 });
 
+export const compareSchema = z.object({
+  year: z.coerce.number().int().min(2000).max(2100),
+  month: z.coerce.number().int().min(1).max(12),
+});
+
 export const saveSchema = z.object({
   id: z.coerce.number().int().positive().optional(),
   txn_date: z.coerce.date(),

@@ -201,4 +201,33 @@ export default {
 
     return { monthly, by_account, by_department, totals: { income, expense, net: income - expense } };
   },
+
+  /** 기간 비교: 이번달 vs 지난달 vs 전년동월 */
+  async compare({ year, month }) {
+    const agg = async (y, m) => {
+      const start = new Date(Date.UTC(y, m - 1, 1));
+      const end = new Date(Date.UTC(y, m, 0, 23, 59, 59));
+      const g = await prisma.financeTransaction.groupBy({
+        by: ["type"],
+        where: { txn_date: { gte: start, lte: end } },
+        _sum: { amount: true },
+      });
+      let income = 0;
+      let expense = 0;
+      for (const r of g) {
+        const v = Number(r._sum.amount || 0);
+        if (r.type === "INCOME") income = v;
+        else if (r.type === "EXPENSE") expense = v;
+      }
+      return { income, expense, net: income - expense };
+    };
+
+    const pm = month === 1 ? { y: year - 1, m: 12 } : { y: year, m: month - 1 };
+    const [current, prevMonth, prevYear] = await Promise.all([
+      agg(year, month),
+      agg(pm.y, pm.m),
+      agg(year - 1, month),
+    ]);
+    return { current, prevMonth, prevYear };
+  },
 };
