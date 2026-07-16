@@ -398,6 +398,7 @@ model Department {
   appointments        Appointment[]        @relation("AppointmentDept")
   admissions          Admission[]          @relation("AdmissionDept")
   insuranceClaims     InsuranceClaim[]     @relation("ClaimDept")
+  encounters          Encounter[]          @relation("EncounterDept")
 
   sort       Int      @default(0)
   is_active  Boolean  @default(true)
@@ -439,6 +440,7 @@ model Employee {
   approvedLeaves LeaveRequest[]    @relation("LeaveApprover") // 이 직원이 승인/반려한 신청
   appointments   Appointment[]     @relation("AppointmentDoctor")
   admissions     Admission[]       @relation("AdmissionDoctor")
+  encounters     Encounter[]       @relation("EncounterDoctor")
   headOfDepts    Department[]      @relation("DepartmentHead")
   user           User?             @relation("UserEmployee")
 
@@ -657,8 +659,8 @@ model LeaveRequest {
 model AccountItem {
   id Int @id @default(autoincrement())
 
-  type String  @db.VarChar(10) // INCOME | EXPENSE
-  name String  @db.VarChar(100) // 표시명
+  type String @db.VarChar(10) // INCOME | EXPENSE
+  name String @db.VarChar(100) // 표시명
 
   is_active Boolean @default(true)
   sort      Int     @default(0)
@@ -723,8 +725,8 @@ model FinanceAttachment {
   transaction_id Int
   transaction    FinanceTransaction @relation(fields: [transaction_id], references: [id], onDelete: Cascade)
 
-  path      String  // /uploads/finance/xxx
-  filename  String  // 원본 파일명
+  path      String // /uploads/finance/xxx
+  filename  String // 원본 파일명
   mime_type String?
   size      Int?
   is_image  Boolean @default(false)
@@ -923,6 +925,8 @@ model Appointment {
   doctor_id Int?
   doctor    Employee? @relation("AppointmentDoctor", fields: [doctor_id], references: [id])
 
+  encounters Encounter[] @relation("AppointmentEncounter") // 예약에서 시작된 진료
+
   reserved_at DateTime // 예약 일시 (날짜+시간)
   status      String   @db.VarChar(12) // BOOKED | VISITED | NOSHOW | CANCELED
 
@@ -999,4 +1003,105 @@ model InsuranceClaim {
   @@index([status])
   @@index([claim_date])
   @@index([department_id])
+}
+
+//////////////////////////////////////////////////////////////
+// 진료 · EMR (외래)
+//////////////////////////////////////////////////////////////
+
+/// 성별
+enum Sex {
+  M
+  F
+  OTHER
+}
+
+/// 진료 상태
+enum EncounterStatus {
+  OPEN // 진료 중
+  CLOSED // 완료
+}
+
+/// 환자 등록 — 임상계 공통 마스터 (예약·입원·보험의 자유입력 환자명과 별개)
+model Patient {
+  id         Int       @id @default(autoincrement())
+  patient_no String    @unique @db.VarChar(30) // 환자번호
+  name       String    @db.VarChar(60)
+  birth_date DateTime? @db.Date
+  sex        Sex?
+  phone      String?   @db.VarChar(30)
+  address    String?   @db.VarChar(200)
+  blood_type String?   @db.VarChar(6) // A+, O-, ...
+  allergies  String?   @db.Text // 알레르기/특이사항
+  memo       String?   @db.VarChar(255)
+
+  is_active  Boolean  @default(true)
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  encounters Encounter[]
+
+  @@index([name])
+}
+
+/// 외래 진료 — 한 번의 방문(SOAP + 바이탈)
+model Encounter {
+  id         Int     @id @default(autoincrement())
+  patient_id Int
+  patient    Patient @relation(fields: [patient_id], references: [id], onDelete: Cascade)
+
+  department_id Int?
+  department    Department? @relation("EncounterDept", fields: [department_id], references: [id])
+  doctor_id     Int?
+  doctor        Employee?   @relation("EncounterDoctor", fields: [doctor_id], references: [id])
+
+  // 예약에서 시작된 진료면 연결(선택)
+  appointment_id Int?
+  appointment    Appointment? @relation("AppointmentEncounter", fields: [appointment_id], references: [id])
+
+  encounter_date  DateTime // 진료 일시
+  chief_complaint String?  @db.VarChar(255) // 주호소(C.C)
+
+  // SOAP
+  subjective String? @db.Text // S 주관적
+  objective  String? @db.Text // O 객관적
+  assessment String? @db.Text // A 평가
+  plan       String? @db.Text // P 계획
+
+  // 바이탈 (외래 흔한 항목)
+  bp_systolic  Int? // 수축기
+  bp_diastolic Int? // 이완기
+  pulse        Int? // 맥박
+  temp         Float? // 체온(℃)
+  resp         Int? // 호흡수
+  spo2         Int? // 산소포화도(%)
+  height       Float? // 신장(cm)
+  weight       Float? // 체중(kg)
+
+  status EncounterStatus @default(OPEN)
+  memo   String?         @db.VarChar(255)
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  diagnoses Diagnosis[]
+
+  @@index([patient_id])
+  @@index([encounter_date])
+  @@index([status])
+  @@index([department_id])
+}
+
+/// 진단 — 진료 1:N (상병코드 + 진단명)
+model Diagnosis {
+  id           Int       @id @default(autoincrement())
+  encounter_id Int
+  encounter    Encounter @relation(fields: [encounter_id], references: [id], onDelete: Cascade)
+
+  code       String  @db.VarChar(20) // 상병코드(KCD/ICD, 자유입력)
+  name       String  @db.VarChar(200) // 진단명
+  is_primary Boolean @default(false) // 주상병
+  note       String? @db.VarChar(255)
+
+  @@index([encounter_id])
 }

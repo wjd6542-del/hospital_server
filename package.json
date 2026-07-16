@@ -12,6 +12,7 @@
     "seed:hr": "node prisma/seed-hr.js",
     "seed:leave": "node prisma/seed-leave.js",
     "verify:leave": "node scripts/verifyLeaveReflect.mjs",
+    "verify:emr": "node scripts/verifyEmr.mjs",
     "test": "node --test test/"
   },
   "dependencies": {
