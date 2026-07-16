@@ -394,6 +394,7 @@ model Department {
   purchaseOrders      PurchaseOrder[]      @relation("PODepartment")
   stockMovements      StockMovement[]      @relation("StockMoveDepartment")
   assets              Asset[]              @relation("AssetDepartment")
+  facilityRequests    FacilityRequest[]    @relation("FacilityDepartment")
 
   sort       Int      @default(0)
   is_active  Boolean  @default(true)
@@ -867,4 +868,36 @@ model Asset {
   @@index([status])
   @@index([department_id])
   @@index([acquired_at])
+}
+
+// ─────────────────────────────────────────────
+// 시설(Facility) — 유지보수 요청
+// ─────────────────────────────────────────────
+
+model FacilityRequest {
+  id Int @id @default(autoincrement())
+
+  title    String  @db.VarChar(150) // 요청 제목
+  location String? @db.VarChar(120) // 위치
+  category String? @db.VarChar(60) // 분류(전기/배관/HVAC 등)
+
+  priority String @db.VarChar(10) // LOW | NORMAL | HIGH | URGENT
+  status   String @db.VarChar(12) // RECEIVED | IN_PROGRESS | DONE | CANCELED
+
+  reported_at DateTime  @db.Date // 요청일
+  resolved_at DateTime? @db.Date // 완료일
+
+  department_id Int?
+  department    Department? @relation("FacilityDepartment", fields: [department_id], references: [id])
+
+  assignee   String? @db.VarChar(60) // 담당자(자유 입력)
+  content    String? @db.VarChar(500) // 요청 내용
+  resolution String? @db.VarChar(500) // 처리 내용
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  @@index([status])
+  @@index([reported_at])
+  @@index([department_id])
 }

@@ -33,6 +33,9 @@ const PERMS = [
   // 자산
   ["asset.view", "자산 조회", "자산"],
   ["asset.edit", "자산 편집", "자산"],
+  // 시설
+  ["facility.view", "시설 조회", "시설"],
+  ["facility.edit", "시설 편집", "시설"],
   // 감사로그
   ["logs.view", "감사로그 조회", "감사로그"],
   // 알림
