@@ -11,6 +11,7 @@
     "seed:rbac": "node prisma/seed-rbac.js",
     "seed:hr": "node prisma/seed-hr.js",
     "seed:leave": "node prisma/seed-leave.js",
+    "verify:leave": "node scripts/verifyLeaveReflect.mjs",
     "test": "node --test test/"
   },
   "dependencies": {
