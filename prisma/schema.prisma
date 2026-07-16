@@ -441,6 +441,7 @@ model Employee {
   appointments   Appointment[]     @relation("AppointmentDoctor")
   admissions     Admission[]       @relation("AdmissionDoctor")
   encounters     Encounter[]       @relation("EncounterDoctor")
+  prescriptions  Prescription[]    @relation("PrescriptionDoctor")
   headOfDepts    Department[]      @relation("DepartmentHead")
   user           User?             @relation("UserEmployee")
 
@@ -817,7 +818,8 @@ model Item {
   created_at DateTime @default(now())
   updated_at DateTime @updatedAt
 
-  movements StockMovement[]
+  movements         StockMovement[]
+  prescriptionItems PrescriptionItem[]
 
   @@index([sort])
 }
@@ -1039,7 +1041,8 @@ model Patient {
   created_at DateTime @default(now())
   updated_at DateTime @updatedAt
 
-  encounters Encounter[]
+  encounters    Encounter[]
+  prescriptions Prescription[]
 
   @@index([name])
 }
@@ -1084,7 +1087,8 @@ model Encounter {
   created_at DateTime @default(now())
   updated_at DateTime @updatedAt
 
-  diagnoses Diagnosis[]
+  diagnoses     Diagnosis[]
+  prescriptions Prescription[]
 
   @@index([patient_id])
   @@index([encounter_date])
@@ -1104,4 +1108,70 @@ model Diagnosis {
   note       String? @db.VarChar(255)
 
   @@index([encounter_id])
+}
+
+//////////////////////////////////////////////////////////////
+// 처방 · 투약
+//////////////////////////////////////////////////////////////
+
+/// 처방 상태
+enum PrescriptionStatus {
+  DRAFT // 작성
+  ISSUED // 발행
+  DISPENSED // 조제완료 (재고 차감)
+  CANCELED // 취소
+}
+
+/// 처방 구분
+enum PrescriptionType {
+  INTERNAL // 원내
+  EXTERNAL // 원외
+}
+
+/// 처방 — 진료에서 발행, 조제 시 재고 차감
+model Prescription {
+  id           Int        @id @default(autoincrement())
+  encounter_id Int?
+  encounter    Encounter? @relation(fields: [encounter_id], references: [id])
+  patient_id   Int
+  patient      Patient    @relation(fields: [patient_id], references: [id], onDelete: Cascade)
+  doctor_id    Int?
+  doctor       Employee?  @relation("PrescriptionDoctor", fields: [doctor_id], references: [id])
+
+  prescribed_at DateTime           @db.Date
+  type          PrescriptionType   @default(INTERNAL)
+  status        PrescriptionStatus @default(DRAFT)
+  memo          String?            @db.VarChar(255)
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  items PrescriptionItem[]
+
+  @@index([patient_id])
+  @@index([encounter_id])
+  @@index([status])
+  @@index([prescribed_at])
+}
+
+/// 처방 약품 — 처방 1:N (재고 품목 연계 선택)
+model PrescriptionItem {
+  id              Int          @id @default(autoincrement())
+  prescription_id Int
+  prescription    Prescription @relation(fields: [prescription_id], references: [id], onDelete: Cascade)
+
+  // 재고 약품(Item) 연계 — 있으면 조제 시 재고 차감. null 이면 자유입력.
+  item_id Int?
+  item    Item? @relation(fields: [item_id], references: [id])
+
+  drug_name     String  @db.VarChar(150) // 약품명
+  dosage        String? @db.VarChar(40) // 1회 용량 (예: 500mg)
+  frequency     String? @db.VarChar(40) // 1일 횟수 (예: 3회)
+  duration_days Int? // 투약일수
+  route         String? @db.VarChar(20) // 경구/주사/외용
+  qty           Decimal @default(0) @db.Decimal(12, 2) // 총량 (조제 시 차감량)
+  instruction   String? @db.VarChar(255) // 복약지도
+
+  @@index([prescription_id])
+  @@index([item_id])
 }

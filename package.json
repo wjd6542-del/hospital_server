@@ -13,6 +13,7 @@
     "seed:leave": "node prisma/seed-leave.js",
     "verify:leave": "node scripts/verifyLeaveReflect.mjs",
     "verify:emr": "node scripts/verifyEmr.mjs",
+    "verify:prescription": "node scripts/verifyPrescription.mjs",
     "test": "node --test test/"
   },
   "dependencies": {

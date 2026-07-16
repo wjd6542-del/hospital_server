@@ -50,6 +50,9 @@ const PERMS = [
   ["patient.edit", "환자 편집", "진료"],
   ["emr.view", "진료 조회", "진료"],
   ["emr.edit", "진료 편집", "진료"],
+  ["prescription.view", "처방 조회", "진료"],
+  ["prescription.edit", "처방 편집", "진료"],
+  ["prescription.dispense", "처방 조제", "진료"],
   // 통계
   ["stats.view", "통계 조회", "통계"],
   // 감사로그
