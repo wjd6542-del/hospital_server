@@ -152,4 +152,53 @@ export default {
 
     return { income_total, expense_total, net: income_total - expense_total, by_account };
   },
+
+  /** 연도 대시보드: 월별 추이 + 계정과목별 + 부서별 + 합계 */
+  async dashboard({ year, department_id }) {
+    const start = new Date(Date.UTC(year, 0, 1));
+    const end = new Date(Date.UTC(year, 11, 31, 23, 59, 59));
+    const where = { txn_date: { gte: start, lte: end } };
+    if (department_id) where.department_id = department_id;
+
+    const txns = await prisma.financeTransaction.findMany({
+      where,
+      select: {
+        txn_date: true,
+        type: true,
+        amount: true,
+        account_item: { select: { name: true } },
+        department: { select: { name: true } },
+      },
+    });
+
+    const monthly = Array.from({ length: 12 }, (_, i) => ({ month: i + 1, income: 0, expense: 0 }));
+    const accMap = new Map(); // "name|type" → total
+    const deptMap = new Map(); // name → { income, expense }
+    let income = 0;
+    let expense = 0;
+
+    for (const t of txns) {
+      const amt = Number(t.amount);
+      const mo = new Date(t.txn_date).getUTCMonth(); // @db.Date 는 UTC 자정 저장
+      const isIncome = t.type === "INCOME";
+      if (isIncome) { monthly[mo].income += amt; income += amt; }
+      else { monthly[mo].expense += amt; expense += amt; }
+
+      const ak = `${t.account_item?.name ?? "-"}|${t.type}`;
+      accMap.set(ak, (accMap.get(ak) || 0) + amt);
+
+      const dn = t.department?.name || "미지정";
+      if (!deptMap.has(dn)) deptMap.set(dn, { income: 0, expense: 0 });
+      deptMap.get(dn)[isIncome ? "income" : "expense"] += amt;
+    }
+
+    const by_account = [...accMap.entries()]
+      .map(([k, total]) => { const i = k.lastIndexOf("|"); return { name: k.slice(0, i), type: k.slice(i + 1), total }; })
+      .sort((a, b) => b.total - a.total);
+    const by_department = [...deptMap.entries()]
+      .map(([name, v]) => ({ name, income: v.income, expense: v.expense }))
+      .sort((a, b) => b.income + b.expense - (a.income + a.expense));
+
+    return { monthly, by_account, by_department, totals: { income, expense, net: income - expense } };
+  },
 };

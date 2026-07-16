@@ -31,6 +31,11 @@ export const listSchema = z.object({
 
 export const summarySchema = z.object(filterShape);
 
+export const dashboardSchema = z.object({
+  year: z.coerce.number().int().min(2000).max(2100),
+  department_id: z.coerce.number().int().positive().nullish(),
+});
+
 export const saveSchema = z.object({
   id: z.coerce.number().int().positive().optional(),
   txn_date: z.coerce.date(),
