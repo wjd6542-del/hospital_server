@@ -395,6 +395,7 @@ model Department {
   stockMovements      StockMovement[]      @relation("StockMoveDepartment")
   assets              Asset[]              @relation("AssetDepartment")
   facilityRequests    FacilityRequest[]    @relation("FacilityDepartment")
+  appointments        Appointment[]        @relation("AppointmentDept")
 
   sort       Int      @default(0)
   is_active  Boolean  @default(true)
@@ -434,6 +435,7 @@ model Employee {
   leaveGrants    LeaveGrant[]
   leaveRequests  LeaveRequest[]
   approvedLeaves LeaveRequest[]    @relation("LeaveApprover") // 이 직원이 승인/반려한 신청
+  appointments   Appointment[]     @relation("AppointmentDoctor")
   headOfDepts    Department[]      @relation("DepartmentHead")
   user           User?             @relation("UserEmployee")
 
@@ -899,5 +901,34 @@ model FacilityRequest {
 
   @@index([status])
   @@index([reported_at])
+  @@index([department_id])
+}
+
+// ─────────────────────────────────────────────
+// 예약(Reservation) — 진료 예약
+// ─────────────────────────────────────────────
+
+model Appointment {
+  id Int @id @default(autoincrement())
+
+  patient_name  String  @db.VarChar(60) // 환자명(자유 입력)
+  patient_phone String? @db.VarChar(30)
+
+  department_id Int?
+  department    Department? @relation("AppointmentDept", fields: [department_id], references: [id])
+
+  doctor_id Int?
+  doctor    Employee? @relation("AppointmentDoctor", fields: [doctor_id], references: [id])
+
+  reserved_at DateTime // 예약 일시 (날짜+시간)
+  status      String   @db.VarChar(12) // BOOKED | VISITED | NOSHOW | CANCELED
+
+  memo String? @db.VarChar(255)
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  @@index([reserved_at])
+  @@index([status])
   @@index([department_id])
 }

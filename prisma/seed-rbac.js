@@ -36,6 +36,9 @@ const PERMS = [
   // 시설
   ["facility.view", "시설 조회", "시설"],
   ["facility.edit", "시설 편집", "시설"],
+  // 예약
+  ["reservation.view", "예약 조회", "예약"],
+  ["reservation.edit", "예약 편집", "예약"],
   // 감사로그
   ["logs.view", "감사로그 조회", "감사로그"],
   // 알림
