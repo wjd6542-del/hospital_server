@@ -397,6 +397,7 @@ model Department {
   facilityRequests    FacilityRequest[]    @relation("FacilityDepartment")
   appointments        Appointment[]        @relation("AppointmentDept")
   admissions          Admission[]          @relation("AdmissionDept")
+  insuranceClaims     InsuranceClaim[]     @relation("ClaimDept")
 
   sort       Int      @default(0)
   is_active  Boolean  @default(true)
@@ -966,5 +967,36 @@ model Admission {
 
   @@index([status])
   @@index([admitted_at])
+  @@index([department_id])
+}
+
+// ─────────────────────────────────────────────
+// 보험청구(Insurance Claim)
+// ─────────────────────────────────────────────
+
+model InsuranceClaim {
+  id Int @id @default(autoincrement())
+
+  claim_no     String? @db.VarChar(40) // 청구번호(선택)
+  patient_name String  @db.VarChar(60) // 환자명(자유 입력)
+
+  department_id Int?
+  department    Department? @relation("ClaimDept", fields: [department_id], references: [id])
+
+  insurer    String   @db.VarChar(12) // HEALTH|MEDICAID|AUTO|PRIVATE|OTHER
+  claim_date DateTime @db.Date
+
+  total_amount Decimal @default(0) @db.Decimal(15, 2) // 총 진료비
+  claim_amount Decimal @default(0) @db.Decimal(15, 2) // 청구액
+
+  status String @db.VarChar(12) // DRAFT|CLAIMED|APPROVED|PAID|REJECTED
+
+  memo String? @db.VarChar(255)
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  @@index([status])
+  @@index([claim_date])
   @@index([department_id])
 }
