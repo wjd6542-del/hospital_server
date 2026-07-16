@@ -393,6 +393,7 @@ model Department {
   financeTransactions FinanceTransaction[] @relation("FinanceTxnDepartment")
   purchaseOrders      PurchaseOrder[]      @relation("PODepartment")
   stockMovements      StockMovement[]      @relation("StockMoveDepartment")
+  assets              Asset[]              @relation("AssetDepartment")
 
   sort       Int      @default(0)
   is_active  Boolean  @default(true)
@@ -748,6 +749,7 @@ model Vendor {
   updated_at DateTime @updatedAt
 
   orders PurchaseOrder[]
+  assets Asset[]
 
   @@index([sort])
 }
@@ -833,4 +835,36 @@ model StockMovement {
   @@index([item_id])
   @@index([moved_at])
   @@index([type])
+}
+
+// ─────────────────────────────────────────────
+// 자산(Assets) — 자산 대장
+// ─────────────────────────────────────────────
+
+model Asset {
+  id Int @id @default(autoincrement())
+
+  asset_no String? @db.VarChar(40) // 자산번호
+  name     String  @db.VarChar(150) // 자산명
+  category String? @db.VarChar(60) // 분류(의료장비/IT/가구 등)
+
+  acquired_at  DateTime? @db.Date // 취득일
+  acquire_cost Decimal   @default(0) @db.Decimal(15, 2) // 취득가
+
+  status String @db.VarChar(12) // ACTIVE | REPAIR | IDLE | DISPOSED
+
+  department_id Int?
+  department    Department? @relation("AssetDepartment", fields: [department_id], references: [id])
+
+  vendor_id Int?
+  vendor    Vendor? @relation(fields: [vendor_id], references: [id]) // 구매처
+
+  memo String? @db.VarChar(255)
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  @@index([status])
+  @@index([department_id])
+  @@index([acquired_at])
 }

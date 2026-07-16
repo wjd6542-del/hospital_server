@@ -30,6 +30,9 @@ const PERMS = [
   // 재고
   ["inventory.view", "재고 조회", "재고"],
   ["inventory.edit", "재고 편집", "재고"],
+  // 자산
+  ["asset.view", "자산 조회", "자산"],
+  ["asset.edit", "자산 편집", "자산"],
   // 감사로그
   ["logs.view", "감사로그 조회", "감사로그"],
   // 알림
