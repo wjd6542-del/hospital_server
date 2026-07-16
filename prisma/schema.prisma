@@ -396,6 +396,7 @@ model Department {
   assets              Asset[]              @relation("AssetDepartment")
   facilityRequests    FacilityRequest[]    @relation("FacilityDepartment")
   appointments        Appointment[]        @relation("AppointmentDept")
+  admissions          Admission[]          @relation("AdmissionDept")
 
   sort       Int      @default(0)
   is_active  Boolean  @default(true)
@@ -436,6 +437,7 @@ model Employee {
   leaveRequests  LeaveRequest[]
   approvedLeaves LeaveRequest[]    @relation("LeaveApprover") // 이 직원이 승인/반려한 신청
   appointments   Appointment[]     @relation("AppointmentDoctor")
+  admissions     Admission[]       @relation("AdmissionDoctor")
   headOfDepts    Department[]      @relation("DepartmentHead")
   user           User?             @relation("UserEmployee")
 
@@ -930,5 +932,39 @@ model Appointment {
 
   @@index([reserved_at])
   @@index([status])
+  @@index([department_id])
+}
+
+// ─────────────────────────────────────────────
+// 병동(Ward) — 입원 관리
+// ─────────────────────────────────────────────
+
+model Admission {
+  id Int @id @default(autoincrement())
+
+  patient_name  String  @db.VarChar(60) // 환자명(자유 입력)
+  patient_phone String? @db.VarChar(30)
+
+  room String? @db.VarChar(40) // 병실/병상(자유 입력)
+
+  department_id Int?
+  department    Department? @relation("AdmissionDept", fields: [department_id], references: [id])
+
+  doctor_id Int?
+  doctor    Employee? @relation("AdmissionDoctor", fields: [doctor_id], references: [id])
+
+  admitted_at   DateTime  @db.Date // 입원일
+  discharged_at DateTime? @db.Date // 퇴원일
+
+  status String @db.VarChar(12) // ADMITTED | DISCHARGED
+
+  diagnosis String? @db.VarChar(200) // 진단/사유
+  memo      String? @db.VarChar(255)
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  @@index([status])
+  @@index([admitted_at])
   @@index([department_id])
 }

@@ -39,6 +39,9 @@ const PERMS = [
   // 예약
   ["reservation.view", "예약 조회", "예약"],
   ["reservation.edit", "예약 편집", "예약"],
+  // 병동
+  ["ward.view", "병동 조회", "병동"],
+  ["ward.edit", "병동 편집", "병동"],
   // 감사로그
   ["logs.view", "감사로그 조회", "감사로그"],
   // 알림
