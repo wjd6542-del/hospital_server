@@ -21,6 +21,9 @@ const PERMS = [
   ["leave.view", "휴가 조회", "인사"],
   ["leave.edit", "휴가 편집", "인사"],
   ["leave.approve", "휴가 승인", "인사"],
+  // 재무
+  ["finance.view", "재무 조회", "재무"],
+  ["finance.edit", "재무 편집", "재무"],
   // 감사로그
   ["logs.view", "감사로그 조회", "감사로그"],
   // 알림

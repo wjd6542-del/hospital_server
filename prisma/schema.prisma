@@ -390,6 +390,8 @@ model Department {
 
   employees Employee[] @relation("EmployeeDepartment")
 
+  financeTransactions FinanceTransaction[] @relation("FinanceTxnDepartment")
+
   sort       Int      @default(0)
   is_active  Boolean  @default(true)
   created_at DateTime @default(now())
@@ -637,4 +639,71 @@ model LeaveRequest {
   @@index([employee_id])
   @@index([status])
   @@index([start_date])
+}
+
+// ─────────────────────────────────────────────
+// 재무(Finance) — 수입·지출 장부
+// ─────────────────────────────────────────────
+
+model AccountItem {
+  id Int @id @default(autoincrement())
+
+  type String  @db.VarChar(10) // INCOME | EXPENSE
+  name String  @db.VarChar(100) // 표시명
+
+  is_active Boolean @default(true)
+  sort      Int     @default(0)
+
+  created_at DateTime  @default(now())
+  updated_at DateTime? @updatedAt
+
+  transactions FinanceTransaction[] @relation("FinanceTxnAccount")
+
+  @@unique([type, name])
+  @@index([type, sort])
+}
+
+model FinanceTransaction {
+  id Int @id @default(autoincrement())
+
+  txn_date DateTime @db.Date // 거래 일자
+  type     String   @db.VarChar(10) // INCOME | EXPENSE (account.type 와 일치)
+
+  account_item_id Int
+  account_item    AccountItem @relation("FinanceTxnAccount", fields: [account_item_id], references: [id])
+
+  amount Decimal @db.Decimal(15, 2) // KRW
+
+  department_id Int?
+  department    Department? @relation("FinanceTxnDepartment", fields: [department_id], references: [id])
+
+  vendor String? @db.VarChar(120) // 거래처
+  method String  @db.VarChar(10) // CASH | TRANSFER | CARD | OTHER
+  memo   String? @db.VarChar(255)
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  attachments FinanceAttachment[]
+
+  @@index([txn_date])
+  @@index([type])
+  @@index([account_item_id])
+  @@index([department_id])
+}
+
+model FinanceAttachment {
+  id             Int                @id @default(autoincrement())
+  transaction_id Int
+  transaction    FinanceTransaction @relation(fields: [transaction_id], references: [id], onDelete: Cascade)
+
+  path      String  // /uploads/finance/xxx
+  filename  String  // 원본 파일명
+  mime_type String?
+  size      Int?
+  is_image  Boolean @default(false)
+
+  created_at DateTime @default(now())
+
+  @@index([transaction_id])
 }
