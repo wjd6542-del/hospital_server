@@ -27,6 +27,9 @@ const PERMS = [
   // 구매
   ["purchase.view", "구매 조회", "구매"],
   ["purchase.edit", "구매 편집", "구매"],
+  // 재고
+  ["inventory.view", "재고 조회", "재고"],
+  ["inventory.edit", "재고 편집", "재고"],
   // 감사로그
   ["logs.view", "감사로그 조회", "감사로그"],
   // 알림

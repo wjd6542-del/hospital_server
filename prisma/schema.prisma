@@ -392,6 +392,7 @@ model Department {
 
   financeTransactions FinanceTransaction[] @relation("FinanceTxnDepartment")
   purchaseOrders      PurchaseOrder[]      @relation("PODepartment")
+  stockMovements      StockMovement[]      @relation("StockMoveDepartment")
 
   sort       Int      @default(0)
   is_active  Boolean  @default(true)
@@ -786,4 +787,50 @@ model PurchaseOrderItem {
   unit_price Decimal @db.Decimal(15, 2)
 
   @@index([order_id])
+}
+
+// ─────────────────────────────────────────────
+// 재고(Inventory) — 품목 · 입출고 수불부
+// ─────────────────────────────────────────────
+
+model Item {
+  id Int @id @default(autoincrement())
+
+  name         String  @db.VarChar(150) // 품목명
+  category     String? @db.VarChar(60) // 분류(자유 입력)
+  unit         String? @db.VarChar(20) // 단위(개/박스 등)
+  safety_stock Decimal @default(0) @db.Decimal(12, 2) // 안전재고
+
+  is_active Boolean @default(true)
+  sort      Int     @default(0)
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  movements StockMovement[]
+
+  @@index([sort])
+}
+
+model StockMovement {
+  id Int @id @default(autoincrement())
+
+  item_id Int
+  item    Item @relation(fields: [item_id], references: [id], onDelete: Cascade)
+
+  type String  @db.VarChar(10) // IN | OUT | ADJUST
+  qty  Decimal @db.Decimal(12, 2) // 부호 있는 증감 (입고 +, 출고 -, 조정 ±)
+
+  moved_at DateTime @db.Date
+
+  department_id Int?
+  department    Department? @relation("StockMoveDepartment", fields: [department_id], references: [id])
+
+  memo String? @db.VarChar(255)
+
+  created_at DateTime @default(now())
+
+  @@index([item_id])
+  @@index([moved_at])
+  @@index([type])
 }
