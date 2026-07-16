@@ -56,6 +56,9 @@ const PERMS = [
   ["lab.view", "검사 조회", "진료"],
   ["lab.edit", "검사 편집", "진료"],
   ["lab.result", "검사 결과입력", "진료"],
+  ["billing.view", "수납 조회", "진료"],
+  ["billing.edit", "수납 편집", "진료"],
+  ["billing.pay", "수납 처리", "진료"],
   // 통계
   ["stats.view", "통계 조회", "통계"],
   // 감사로그

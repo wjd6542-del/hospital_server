@@ -399,6 +399,7 @@ model Department {
   admissions          Admission[]          @relation("AdmissionDept")
   insuranceClaims     InsuranceClaim[]     @relation("ClaimDept")
   encounters          Encounter[]          @relation("EncounterDept")
+  bills               Bill[]               @relation("BillDepartment")
 
   sort       Int      @default(0)
   is_active  Boolean  @default(true)
@@ -1045,6 +1046,7 @@ model Patient {
   encounters    Encounter[]
   prescriptions Prescription[]
   labOrders     LabOrder[]
+  bills         Bill[]
 
   @@index([name])
 }
@@ -1092,6 +1094,7 @@ model Encounter {
   diagnoses     Diagnosis[]
   prescriptions Prescription[]
   labOrders     LabOrder[]
+  bills         Bill[]
 
   @@index([patient_id])
   @@index([encounter_date])
@@ -1271,4 +1274,64 @@ model LabOrderItem {
 
   @@index([order_id])
   @@index([lab_test_id])
+}
+
+//////////////////////////////////////////////////////////////
+// 수납 · 정산
+//////////////////////////////////////////////////////////////
+
+/// 수납 상태
+enum BillStatus {
+  UNPAID // 미수납
+  PARTIAL // 부분수납
+  PAID // 완납
+  CANCELED // 취소
+}
+
+/// 수납/청구서 — 진료 단위
+model Bill {
+  id           Int        @id @default(autoincrement())
+  encounter_id Int?
+  encounter    Encounter? @relation(fields: [encounter_id], references: [id])
+  patient_id   Int
+  patient      Patient    @relation(fields: [patient_id], references: [id], onDelete: Cascade)
+
+  department_id Int?
+  department    Department? @relation("BillDepartment", fields: [department_id], references: [id])
+
+  billed_at DateTime @db.Date
+
+  total_amount     Decimal @default(0) @db.Decimal(15, 2) // 항목 합계
+  insurance_amount Decimal @default(0) @db.Decimal(15, 2) // 보험 부담
+  patient_amount   Decimal @default(0) @db.Decimal(15, 2) // 본인 부담 (총액 − 보험)
+  paid_amount      Decimal @default(0) @db.Decimal(15, 2) // 수납 누계
+
+  status BillStatus @default(UNPAID)
+  method String?    @db.VarChar(10) // 마지막 수납수단 CASH|CARD|TRANSFER|OTHER
+  memo   String?    @db.VarChar(255)
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  items BillItem[]
+
+  @@index([patient_id])
+  @@index([encounter_id])
+  @@index([status])
+  @@index([billed_at])
+}
+
+/// 수납 항목 — 수납 1:N
+model BillItem {
+  id      Int  @id @default(autoincrement())
+  bill_id Int
+  bill    Bill @relation(fields: [bill_id], references: [id], onDelete: Cascade)
+
+  category   String  @db.VarChar(20) // 진찰/처방/검사/처치/기타
+  name       String  @db.VarChar(150)
+  qty        Int     @default(1)
+  unit_price Decimal @default(0) @db.Decimal(15, 2)
+  amount     Decimal @default(0) @db.Decimal(15, 2) // qty × 단가
+
+  @@index([bill_id])
 }

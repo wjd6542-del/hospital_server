@@ -12,10 +12,12 @@
     "seed:hr": "node prisma/seed-hr.js",
     "seed:leave": "node prisma/seed-leave.js",
     "seed:lab": "node prisma/seed-lab.js",
+    "seed:billing": "node prisma/seed-billing.js",
     "verify:leave": "node scripts/verifyLeaveReflect.mjs",
     "verify:emr": "node scripts/verifyEmr.mjs",
     "verify:prescription": "node scripts/verifyPrescription.mjs",
     "verify:lab": "node scripts/verifyLab.mjs",
+    "verify:billing": "node scripts/verifyBilling.mjs",
     "test": "node --test test/"
   },
   "dependencies": {
