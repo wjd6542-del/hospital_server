@@ -658,9 +658,26 @@ model AccountItem {
   updated_at DateTime? @updatedAt
 
   transactions FinanceTransaction[] @relation("FinanceTxnAccount")
+  budgets      FinanceBudget[]
 
   @@unique([type, name])
   @@index([type, sort])
+}
+
+model FinanceBudget {
+  id Int @id @default(autoincrement())
+
+  account_item_id Int
+  account_item    AccountItem @relation(fields: [account_item_id], references: [id], onDelete: Cascade)
+
+  year   Int
+  amount Decimal @db.Decimal(15, 2) // 연간 예산(KRW)
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  @@unique([account_item_id, year])
+  @@index([year])
 }
 
 model FinanceTransaction {
