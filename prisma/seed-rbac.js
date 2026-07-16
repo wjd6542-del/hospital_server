@@ -45,6 +45,8 @@ const PERMS = [
   // 보험청구
   ["insurance.view", "보험청구 조회", "보험청구"],
   ["insurance.edit", "보험청구 편집", "보험청구"],
+  // 통계
+  ["stats.view", "통계 조회", "통계"],
   // 감사로그
   ["logs.view", "감사로그 조회", "감사로그"],
   // 알림
